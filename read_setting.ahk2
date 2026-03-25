@@ -1,0 +1,59 @@
+#Requires AutoHotkey v2
+
+iniFileUrl := A_ScriptDir "\setting.ini"
+sectionText := IniRead(iniFileUrl, "default-hotkey")
+lines := StrSplit(sectionText, "`n", "`r")
+
+; 看iniRead讀到什麼
+msgbox sectionText
+debugText := ""
+for i, v in lines {
+    debugText .= "行 " i ": " v "`n"
+}
+MsgBox(debugText)
+
+for line in lines
+{
+    if Trim(line) == ""
+        continue
+
+    ; 1. 處理 & 的空格 (先全部拿掉，再補回去，確保是 " & ")
+    line := RegExReplace(line, "\s*&\s*", " & ")
+
+    ; 2. 從右往左找最後一個等號
+    lastEqPos := InStr(line, "=", , -1)
+
+    if (lastEqPos > 0) {
+        ; 拆分
+        rawKey := SubStr(line, 1, lastEqPos - 1)
+        rawAction := SubStr(line, lastEqPos + 1)
+
+        ; 3. 處理等號前後的空格 (規格化)
+        cusHotkey := Trim(rawKey)
+        actionName := Trim(rawAction)
+
+        try {
+            Hotkey(cusHotkey, %actionName%)
+            ; MsgBox "成功綁定: [" cusHotkey "] -> [" actionName "]" ;測試用，成功後可註解
+        } 
+        catch as e {
+            MsgBox "失敗: " actionName "`n熱鍵: " cusHotkey "`n原因: " e.Message
+        }
+    }
+}
+
+; ===== 測試函式 =====
+showMsg(*){
+    MsgBox "showMsg 被觸發"
+}
+
+showMsg2(*){
+    MsgBox "showMsg2 被觸發"
+}
+
+showMsg3(*){
+    MsgBox "showMsg3 被觸發"
+}
+showMsg4(*){
+    msgbox "4444444444"
+}
