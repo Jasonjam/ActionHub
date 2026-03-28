@@ -1,0 +1,19 @@
+;@Ahk2Exe-SetName ActionHub
+;@Ahk2Exe-Base tools\v2_base.bin
+#NoTrayIcon
+
+; 1. 取得執行檔所在的完整資料夾路徑
+dir := A_ScriptDir
+
+; 2. 拼接出完整檔案路徑，並加上引號（防止資料夾路徑有空格）
+ahkExe := '"' . dir . '\tools\AutoHotkey64_v2.exe"'
+mainScript := '"' . dir . '\main.ahk2"'
+
+; 3. 執行程式。注意：我們把 dir 放在第二個參數，指定它是工作目錄
+try {
+    Run(ahkExe . ' ' . mainScript, dir)
+} catch Error as e {
+    MsgBox("啟動失敗！`n請確認資料夾內是否有：`n1. AutoHotkey64.exe`n2. main.ahk2`n`n錯誤訊息：" . e.Message)
+}
+
+ExitApp()

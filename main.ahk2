@@ -3,8 +3,7 @@
 #Include action.ahk2
 
 ; ---- 管理員模式檢查 (v2 轉檔相容版) ----
-if !A_IsAdmin
-{
+if !A_IsAdmin {
     try {
         if A_IsCompiled
             Run('*RunAs "' A_ScriptFullPath '"') ; 如果是 EXE，直接以管理員權限啟動自己
@@ -14,11 +13,25 @@ if !A_IsAdmin
     ExitApp()
 }
 
+; --- 系統托盤選單配置 ---
+Tray := A_TrayMenu
+Tray.Delete() ; 清除預設的選單項目（如 Suspend, Pause）
+
+; 加入自定義項目
+Tray.Add("打開主視窗", (*) => mainGui.Show())
+Tray.Add("快捷鍵設定", (*) => ShowSettingGui())
+Tray.Add() ; 這是分隔線
+Tray.Add("重新載入腳本", (*) => Reload())
+Tray.Add("退出程式", (*) => ExitApp())
+
+; 設定點擊托盤圖示兩下的預設動作
+Tray.Default := "打開主視窗"
+
 ; --- 初始化資料與讀取 INI ---
 iniFileUrl := A_ScriptDir "\setting.ini"
 hotkeyMap := Map() ; 存儲ini的熱鍵與函式名
 ActionFnStatus := Map() ; 紀錄 action 是否運作
-global isSettingOpen := false 
+global isSettingOpen := false
 
 ; 讀取視窗位置與 Pin 狀態
 savedPos := IniRead(iniFileUrl, "Window", "Pos", "xCenter yCenter")
@@ -40,8 +53,7 @@ lines := StrSplit(sectionText, "`n", "`r")
 
 guiHotkeyList := [] ; 給 gui 渲染 hotkey 用
 
-for line in lines
-{
+for line in lines {
     line := Trim(line)
     if (line == "" || !InStr(line, "="))
         continue
@@ -68,21 +80,20 @@ for line in lines
 
         ; 如果函式不存在，直接標記失敗並跳過後續綁定
         if (!funcExists) {
-            hotkeyMap[cusHotkey] := {act: actionName, isBindMap : 0}
-            continue 
+            hotkeyMap[cusHotkey] := { act: actionName, isBindMap: 0 }
+            continue
         }
-
 
         try {
             ; C. 真正執行綁定 (動態解析函式名稱)
             Hotkey(cusHotkey, ToggleAction.Bind(actionName, 100))
-            
+
             ; D. 存入 Map 供 GUI 渲染 (isBindMap: 1 代表綁定成功)
-            hotkeyMap[cusHotkey] := {act: actionName, isBindMap : 1}
-        } 
+            hotkeyMap[cusHotkey] := { act: actionName, isBindMap: 1 }
+        }
         catch {
             ; 如果函式找不到或熱鍵語法錯，標記為 isBindMap: 0
-            hotkeyMap[cusHotkey] := {act: actionName, isBindMap : 0}
+            hotkeyMap[cusHotkey] := { act: actionName, isBindMap: 0 }
         }
 
     }
@@ -100,7 +111,7 @@ for hk, info in hotkeyMap {
 
 ; --- 創建 GUI ---
 ; 根據讀取的 savedAOT 決定初始狀態
-aotOption := (savedAOT == "ON") ? "+AlwaysOnTop" : "-AlwaysOnTop" 
+aotOption := (savedAOT == "ON") ? "+AlwaysOnTop" : "-AlwaysOnTop"
 mainGui := Gui(aotOption, "ActionHub")
 mainGui.SetFont("s10", "Microsoft JhengHei")
 
@@ -126,17 +137,17 @@ for index, hk in guiHotkeyList {
     ; Hotkey 顯示
     displayHK := StrReplace(hk, "&", "&&") ; 處理 & 符號顯示
     mainGui.Add("Text", "x20 y" yPos " w110", displayHK)
-    
+
     ; --- Action 顯示: 欄位與狀態標記 ---
     if (info.isBindMap == 1) {
         ; A. 成功綁定的情況：黑字、紅色 X、加入連動 Map
         mainGui.Add("Text", "x140 y" yPos " w130 cBlack", info.act)
         statusControls[info.act] := mainGui.Add("Text", "x290 y" yPos " w40 cRed", "X")
-    } 
+    }
     if (info.isBindMap == 0) {
         ; B. 綁定失敗的情況：灰字、灰色驚嘆號、不加入 Map
         mainGui.Add("Text", "x140 y" yPos " w130 cGray", info.act)
-        mainGui.Add("Text", "x290 y" yPos " w40 cSilver", "!") 
+        mainGui.Add("Text", "x290 y" yPos " w40 cSilver", "!")
     }
 
     ; 畫線
@@ -152,16 +163,16 @@ mainGui.Show(savedPos " w340")
 
 ; --- BTN事件 ---
 ; 視窗關閉
-mainGui.OnEvent("Close", (*) => ( SaveStatus(), ExitApp() ))
+mainGui.OnEvent("Close", (*) => (SaveStatus(), ExitApp()))
 ; reload按鍵
-btnReload.OnEvent("Click", (*) => ( SaveStatus(), Reload() ))
+btnReload.OnEvent("Click", (*) => (SaveStatus(), Reload()))
 ; pin按鍵
 btnPin.OnEvent("Click", ChangeAOT)
 ; setting按鍵
 btnSetting.OnEvent("Click", ShowSettingGui)
 
 ; --- FUNC區 ----
-RCtrl & F5::Reload() ; 強制重啟
+RCtrl & F5:: Reload() ; 強制重啟
 
 ; 儲存視窗的狀態，包含:位置, AOT狀態
 SaveStatus() {
@@ -214,14 +225,14 @@ ToggleAction(actionName, intervalMs := 100, *) {
     ; --- 關鍵攔截：如果設定頁面開著，直接結束不執行 ---
     if (isSettingOpen)
         return
-    
+
     ; 1. 初始化狀態 (如果沒跑過)
     if (!ActionFnStatus.Has(actionName))
         ActionFnStatus[actionName] := false
 
     ; 2. 切換開關 (如果是 true 變 false，如果是 false 變 true)
     ActionFnStatus[actionName] := !ActionFnStatus[actionName]
-    
+
     ; 取得函式物件
     fn := %actionName%
 
@@ -230,7 +241,7 @@ ToggleAction(actionName, intervalMs := 100, *) {
         SetTimer(fn, intervalMs)     ; 按照間隔重複執行
         __ShowTip(actionName " : ON (" intervalMs "ms)") ; 啟動時, tooltip 提示
         UpdateGUIStatus(actionName, true)  ; GUI 變綠 O
-    } 
+    }
     if (!ActionFnStatus[actionName]) {
         ; --- 關閉模式 ---
         SetTimer(fn, 0)              ; 停止 Timer
@@ -252,9 +263,9 @@ ShowSettingGui(*) {
         for item in guiHotkeyList {
             ; 確保是深拷貝，避免改到原始物件指標
             if (item is Object)
-                previewHKList.Push({hk: item.hk, act: item.act})
+                previewHKList.Push({ hk: item.hk, act: item.act })
             else
-                previewHKList.Push({hk: item, act: ""}) ; 處理字串或物件相容
+                previewHKList.Push({ hk: item, act: "" }) ; 處理字串或物件相容
         }
     }
 
@@ -262,28 +273,28 @@ ShowSettingGui(*) {
     cfg := {
         guiW: 350,
         ; --- 標題 & 內容區 ---
-        noX: 10,      noW: 20,       ; 算法 X + W = 終點，終點+間隔(10)= 下個X
-        delX: 40,     delW: 30,      
-        hkX: 80,      hkW: 120,      
-        actX: 210,    actW: 130,    actTitleX: 212, ; 視覺多+1px 211
-        rowH: 25,     spaceH: 35,
+        noX: 10, noW: 20,       ; 算法 X + W = 終點，終點+間隔(10)= 下個X
+        delX: 40, delW: 30,
+        hkX: 80, hkW: 120,
+        actX: 210, actW: 130, actTitleX: 212, ; 視覺多+1px 211
+        rowH: 25, spaceH: 35,
         startY: 45, ; 初始Y
         ; --- 底部功能區 ---
-        hrX: 10,      hrW: 330,  ; guiW350 左右各-10
+        hrX: 10, hrW: 330,  ; guiW350 左右各-10
         hrMB: 15, ; hr margin bottom
-        addBtnX: 10,  addBtnW: 80,
-        saveBtnX: 190,   saveBtnW: 70,
+        addBtnX: 10, addBtnW: 80,
+        saveBtnX: 190, saveBtnW: 70,
         cancelBtnX: 270, cancelBtnW: 70
     }
-    MakePos(x, y, w, h, extra := ""){
+    MakePos(x, y, w, h, extra := "") {
         opt := Format("x{:d} y{:d} w{:d} h{:d}", x, y, w, h)
-        
-        IF extra != ""
+
+        if extra != ""
             opt .= " " extra
-        
+
         return opt
     }
-    
+
     ; 如果Setting已打開，就直接帶到最前面
     try {
         if (settingGui != 0 && WinExist("ahk_id " settingGui.Hwnd)) {
@@ -321,7 +332,7 @@ ShowSettingGui(*) {
     ; 為了讓使用者新增時有提示，我們還是準備一個有「Select」的清單給新增列用
     ; 但「現有列」我們可以決定要不要顯示它
     actionListWithSelect := []
-    for item in actionList{
+    for item in actionList {
         actionListWithSelect.Push(item)
     }
     actionListWithSelect.InsertAt(1, "-- Select --")
@@ -333,14 +344,14 @@ ShowSettingGui(*) {
         ; 判斷傳進來的是單純字串(啟動時)還是物件(AddNew後)
         currentHK := (rowData is Object) ? rowData.hk : rowData
         currentAct := (rowData is Object) ? rowData.act : ""
-        
+
         ; 修改 info 的獲取邏輯
         if (currentAct != "") {
             ; 如果已經有暫存的動作，就用暫存的
-            info := {act: currentAct, isBindMap: 1}
+            info := { act: currentAct, isBindMap: 1 }
         } else {
             ; 否則去 Map 找 (第一次開啟時走這)
-            info := hotkeyMap.Get(currentHK, {act: "-- Select --", isBindMap: 0})
+            info := hotkeyMap.Get(currentHK, { act: "-- Select --", isBindMap: 0 })
         }
 
         row := {}
@@ -356,9 +367,10 @@ ShowSettingGui(*) {
 
         ; 熱鍵輸入框 (Edit)
         row.editObj := settingGui.Add("Edit", MakePos(cfg.hkX, currentY, cfg.hkW, cfg.rowH), currentHK)
-        
-        ; 動作選擇 
-        row.ddlObj := settingGui.Add("DropDownList", Format("x{:d} y{:d} w{:d}", cfg.actX, currentY, cfg.actW), actionListWithSelect)
+
+        ; 動作選擇
+        row.ddlObj := settingGui.Add("DropDownList", Format("x{:d} y{:d} w{:d}", cfg.actX, currentY, cfg.actW),
+        actionListWithSelect)
 
         ; 讓 DropDownList 自動選中目前 INI 裡的那個動作
         hasMatched := false
@@ -369,7 +381,7 @@ ShowSettingGui(*) {
                 break
             }
         }
-        if (!hasMatched){
+        if (!hasMatched) {
             row.ddlObj.Choose(1) ; 沒對到就顯示 "-- Select --"
         }
 
@@ -380,14 +392,14 @@ ShowSettingGui(*) {
         currentY += cfg.spaceH
     }
 
-
     ; --- 底部功能區 ---
     ; 分隔線
     settingGui.Add("Text", Format("x{:d} y{:d} w{:d} h1 BackgroundGray", cfg.hrX, currentY, cfg.hrW))
     currentY += cfg.hrMB
 
     ; Add New
-    btnAddNewRow := settingGui.Add("Button", Format("x{:d} y{:d} w{:d}", cfg.addBtnX, currentY, cfg.addBtnW), "+ Add New")
+    btnAddNewRow := settingGui.Add("Button", Format("x{:d} y{:d} w{:d}", cfg.addBtnX, currentY, cfg.addBtnW),
+    "+ Add New")
     btnAddNewRow.OnEvent("Click", AddNewRow)
 
     ; Save
@@ -396,7 +408,8 @@ ShowSettingGui(*) {
     btnSave.OnEvent("Click", (*) => ProcessSave(settingRows))
 
     ; Cancel
-    btnCancel := settingGui.Add("Button", Format("x{:d} y{:d} w{:d}", cfg.cancelBtnX, currentY, cfg.cancelBtnW), "Cancel")
+    btnCancel := settingGui.Add("Button", Format("x{:d} y{:d} w{:d}", cfg.cancelBtnX, currentY, cfg.cancelBtnW),
+    "Cancel")
     btnCancel.OnEvent("Click", (*) => CloseSetting(settingGui))
 
     ; 顯示視窗，計算在MAIN PAGE的右下方
@@ -418,21 +431,21 @@ ShowSettingGui(*) {
             ; 確保這個 row 物件裡真的有控制項，才抓資料
             if (r.HasOwnProp("editObj") && r.HasOwnProp("ddlObj")) {
                 tempData.Push({
-                    hk: r.editObj.Value, 
+                    hk: r.editObj.Value,
                     act: r.ddlObj.Text ; <--- 關鍵：把選中的動作文字也抓下來
                 })
             }
         }
-        
+
         ; 2. 補一個全新的空列資料
-        tempData.Push({hk: "", act: "-- Select --"}) 
-        
+        tempData.Push({ hk: "", act: "-- Select --" })
+
         ; 3. 更新全域清單 (雖然它叫 guiHotkeyList，但我們現在塞物件進去)
         previewHKList := tempData
-        
+
         settingGui.Destroy()
-        settingGui := 1 
-        isSettingOpen := false 
+        settingGui := 1
+        isSettingOpen := false
         ShowSettingGui()
     }
 
@@ -448,21 +461,21 @@ ShowSettingGui(*) {
             ; 確保這個 row 物件裡真的有控制項，才抓資料
             if (r.HasOwnProp("editObj") && r.HasOwnProp("ddlObj")) {
                 tempData.Push({
-                    hk: r.editObj.Value, 
+                    hk: r.editObj.Value,
                     act: r.ddlObj.Text
                 })
             }
         }
-        
+
         ; 確保 index 沒有超出範圍 (防止點太快)
         if (idx <= tempData.Length) {
             tempData.RemoveAt(idx) ; 移除點擊的那一行
         }
         previewHKList := tempData
-        
+
         settingGui.Destroy()
         settingGui := 1
-        isSettingOpen := false 
+        isSettingOpen := false
         ShowSettingGui()
     }
 }
@@ -471,10 +484,10 @@ ScanActions() {
     actionFile := A_ScriptDir "\action.ahk2"
     if !FileExist(actionFile)
         return [] ; 萬一檔案不存在，回傳一個預設值
-    
+
     content := FileRead(actionFile, "UTF-8")
     actions := []
-    
+
     ; 正則表達式解釋：
     ; m) -> 多行模式
     ; ^(\w+) -> 每一行開頭的英數單字 (函式名)
@@ -498,7 +511,7 @@ ProcessSave(rows) {
     for index, row in rows {
         h := Trim(row.editObj.Value) ; h = hotkey
         a := row.ddlObj.Text ; a = action mame
-        
+
         ; 空值檢查
         if (h == "" || a == "-- Select --") {
             errorRows.Push(index) ; 存入錯誤紀錄
@@ -563,12 +576,12 @@ ProcessSave(rows) {
         for index, row in rows {
             h := Trim(row.editObj.Value)
             a := row.ddlObj.Text
-            
+
             ; --- 處理熱鍵中的 & 符號 ---
             ; 使用正則：找 & 符號，不管它原本左右有多少空格，統一改成一個空格
             ; 例如: "RAlt&6" 或 "RAlt  &6" -> "RAlt & 6"
             h := RegExReplace(h, "\s*&\s*", " & ")
-            
+
             ; --- 處理 = 左右的空格 ---
             ; AHK 的 IniWrite 會把傳入的字串寫入 Section
             ; 我們構建 "Key = Value" 的格式
@@ -576,7 +589,7 @@ ProcessSave(rows) {
             formattedString .= h " = " a "`n"
 
         }
-        
+
         ; 移除最後一個換行符，保持乾淨
         return RTrim(formattedString, "`n`r")
 
