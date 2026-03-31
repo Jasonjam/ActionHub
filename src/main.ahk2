@@ -28,7 +28,13 @@ Tray.Add("退出程式", (*) => ExitApp())
 Tray.Default := "打開主視窗"
 
 ; --- 初始化資料與讀取 INI ---
-iniFileUrl := A_ScriptDir "\setting.ini"
+global SRC_DIR := A_ScriptDir
+
+if (A_IsCompiled) {
+    ; EXE 在根目錄，所以要補上 \src
+    SRC_DIR := A_ScriptDir "\src"
+}
+iniFileUrl := SRC_DIR "\setting.ini"
 hotkeyMap := Map() ; 存儲ini的熱鍵與函式名
 ActionFnStatus := Map() ; 紀錄 action 是否運作
 global isSettingOpen := false
@@ -481,7 +487,8 @@ ShowSettingGui(*) {
 }
 
 ScanActions() {
-    actionFile := A_ScriptDir "\action.ahk2"
+    global SRC_DIR ; 抓變數
+    actionFile := SRC_DIR "\action.ahk2"
     if !FileExist(actionFile)
         return [] ; 萬一檔案不存在，回傳一個預設值
 
