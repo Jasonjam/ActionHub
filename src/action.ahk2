@@ -1,18 +1,5 @@
-; === Test Func Area ===
-showMsg(*) => (
-	MsgBox("111")
-)
+; === 編輯區，在此區間可新增/編輯動作===
 
-showMsg2(*) => MsgBox("2")
-; showMsg3(*) => MsgBox("3")
-
-showMsg4(*) => MsgBox("4")
-
-; testOneShot(*){
-;     __ShowTip("執行單次動作中...")
-;     Sleep(2000)
-;     __OneShotDone(A_ThisFunc)
-; }
 test__SleepTimer(*) {
     ; 1. 執行長達 5 秒的倒數
     ; 傳入 A_ThisFunc 讓 __SleepTimer 監控這個函式的開關狀態
@@ -49,8 +36,9 @@ Boss_snakeBoss(*) {
 
     ; __OneShotDone(A_ThisFunc)
 }
+; === 編輯區，結束 ===
 
-; === 通用區 ===
+; === 通用區 (勿動) ===
 ; one-shot 動作結束後，延遲關閉並更新 GUI
 __OneShotDone(actionFnName) {
     global ActionFnStatus
