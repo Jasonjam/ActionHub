@@ -14,12 +14,13 @@ if !A_IsAdmin {
 }
 
 ; --- 系統托盤選單配置 ---
-Tray := A_TrayMenu
+A_IconTip := "ActionHub" ; 設定托盤圖示的提示文字
+Tray := A_TrayMenu ; 取得托盤選單物件
 Tray.Delete() ; 清除預設的選單項目（如 Suspend, Pause）
 
 ; 加入自定義項目
-Tray.Add("打開主視窗", (*) => mainGui.Show())
-Tray.Add("快捷鍵設定", (*) => ShowSettingGui())
+Tray.Add("打開主視窗", (*) => mainGui.Show() )
+Tray.Add("編輯動作檔", (*) => EditActionFile() )
 Tray.Add() ; 這是分隔線
 Tray.Add("重新載入腳本", (*) => Reload())
 Tray.Add("退出程式", (*) => ExitApp())
@@ -36,7 +37,7 @@ if (A_IsCompiled) {
 }
 iniFileUrl := SRC_DIR "\setting.ini"
 hotkeyMap := Map() ; 存儲ini的熱鍵與函式名
-ActionFnStatus := Map() ; 紀錄 action 是否運作
+global ActionFnStatus := Map() ; 紀錄 action 是否運作
 global isSettingOpen := false
 
 ; 讀取視窗位置與 Pin 狀態
@@ -169,9 +170,9 @@ mainGui.Show(savedPos " w340")
 
 ; --- BTN事件 ---
 ; 視窗關閉
-mainGui.OnEvent("Close", (*) => (SaveStatus(), ExitApp()))
+mainGui.OnEvent("Close", (*) => ( mainGui.Hide() ))
 ; reload按鍵
-btnReload.OnEvent("Click", (*) => (SaveStatus(), Reload()))
+btnReload.OnEvent("Click", (*) => ( SaveStatus(), Reload() ))
 ; pin按鍵
 btnPin.OnEvent("Click", ChangeAOT)
 ; setting按鍵
@@ -507,6 +508,19 @@ ScanActions() {
     }
     return actions
 
+}
+
+; --- 編輯動作檔的執行函式 ---
+EditActionFile(*) {
+    global SRC_DIR ; 抓變數
+    actionFileUrl := SRC_DIR "\action.ahk2"
+
+    ; 使用編輯器開啟 action.ahk2
+    try {
+        Run('notepad.exe "' actionFileUrl '"')
+    } catch {
+        MsgBox("無法開啟檔案：`n" actionFileUrl, "錯誤", 16)
+    }
 }
 
 ProcessSave(rows) {
