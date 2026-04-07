@@ -1,0 +1,47 @@
+; === 通用區 (勿動) ===
+; one-shot 動作結束後，延遲關閉並更新 GUI
+__OneShotDone(actionFnName) {
+    global ActionFnStatus
+
+    if (!ActionFnStatus.Has(actionFnName) || !ActionFnStatus[actionFnName])
+        return
+
+    ; 檢查是否為 one-shot 模式
+    if (ActionFnStatus.Has(actionFnName "_one") && ActionFnStatus[actionFnName "_one"]) {
+        ; 這裡不馬上關，而是等間隔時間後再關 (或是直接關，取決於你需求)
+        ; 但最重要是通知 GUI 變回紅 X
+        UpdateGUIStatus(actionFnName, false)
+        ActionFnStatus[actionFnName] := false
+    }
+}
+
+; Sleep 倒數顯示 (V2 版)
+__SleepTimer(totalMs, actionFnName, label := "") {
+    global ActionFnStatus
+    end := A_TickCount + totalMs
+
+    while (A_TickCount < end) {
+        if (ActionFnStatus.Has(actionFnName) && !ActionFnStatus[actionFnName]) {
+            ; 如果被中斷了，我們只在「不是因為全域 Reload」的情況下才清空
+            ; 這裡其實只要 return false 即可，讓 ToggleAction 去決定要顯示什麼
+            return false
+        }
+        remain := Round((end - A_TickCount) / 1000, 1)
+        ToolTip((label ? label " : " : "") . remain "s")
+        Sleep(100)
+    }
+
+    ; 只有正常跑完倒數，才執行清空
+    ; 這樣就不會蓋掉 ToggleAction 剛跳出來的 OFF 提示
+    if (ActionFnStatus.Has(actionFnName) && ActionFnStatus[actionFnName])
+        ToolTip()
+
+    return true
+}
+
+; ; __ShowTip (V2 版)
+__ShowTip(text, ms := 1000) {
+    ToolTip(text)
+    ; V2 的 SetTimer 傳入函式物件，() => ToolTip() 是匿名函式，直接清空文字
+    SetTimer(() => ToolTip(), -ms)
+}
