@@ -1,5 +1,6 @@
 #SingleInstance Force
 #Requires AutoHotkey v2
+#Include action_lib.ahk2
 #Include action.ahk2
 
 ; ---- 管理員模式檢查 (v2 轉檔相容版) ----
@@ -14,13 +15,32 @@ if !A_IsAdmin {
 }
 
 ; --- 系統托盤選單配置 ---
-Tray := A_TrayMenu
+A_IconTip := "ActionHub" ; 設定托盤圖示的提示文字
+Tray := A_TrayMenu ; 取得托盤選單物件
 Tray.Delete() ; 清除預設的選單項目（如 Suspend, Pause）
 
 ; 加入自定義項目
 Tray.Add("打開主視窗", (*) => mainGui.Show())
-Tray.Add("快捷鍵設定", (*) => ShowSettingGui())
-Tray.Add() ; 這是分隔線
+
+Tray.Add() ; ---分隔線---
+
+subMenu_edit := Menu() ; 定義 子選單
+subMenu_edit.Add("編輯動作檔", EditFile.Bind("action"))
+subMenu_edit.Add("編輯設定檔", EditFile.Bind("setting"))
+Tray.Add("編輯", subMenu_edit)  ; 渲染 子選單
+
+Tray.Add() ; ---分隔線---
+
+subMenu_reset := Menu() ; 定義 子選單
+subMenu_reset.Add("若改壞，再使用以下功能", (*) => 0)
+subMenu_reset.Disable("1&") ; 灰掉 + 不能點。引號內的 1& 代表第1項的索引
+subMenu_reset.Add() ; ---分隔線---
+subMenu_reset.Add("重置動作檔(Action Func)", ResetFile.Bind("action"))
+subMenu_reset.Add("重置設定檔(視窗 && 熱鍵)", ResetFile.Bind("setting"))
+Tray.Add("重置 (警告)", subMenu_reset)  ; 渲染 子選單
+
+Tray.Add() ; ---分隔線---
+
 Tray.Add("重新載入腳本", (*) => Reload())
 Tray.Add("退出程式", (*) => ExitApp())
 
@@ -35,8 +55,9 @@ if (A_IsCompiled) {
     SRC_DIR := A_ScriptDir "\src"
 }
 iniFileUrl := SRC_DIR "\setting.ini"
+actionFileUrl := SRC_DIR "\action.ahk2"
 hotkeyMap := Map() ; 存儲ini的熱鍵與函式名
-ActionFnStatus := Map() ; 紀錄 action 是否運作
+global ActionFnStatus := Map() ; 紀錄 action 是否運作
 global isSettingOpen := false
 
 ; 讀取視窗位置與 Pin 狀態
@@ -169,7 +190,7 @@ mainGui.Show(savedPos " w340")
 
 ; --- BTN事件 ---
 ; 視窗關閉
-mainGui.OnEvent("Close", (*) => (SaveStatus(), ExitApp()))
+mainGui.OnEvent("Close", (*) => (mainGui.Hide()))
 ; reload按鍵
 btnReload.OnEvent("Click", (*) => (SaveStatus(), Reload()))
 ; pin按鍵
@@ -509,6 +530,72 @@ ScanActions() {
 
 }
 
+; --- 編輯檔案 ---
+EditFile(fileType, *) {
+    global actionFileUrl, iniFileUrl
+
+    ; 偵測 變數: 開啟的檔案
+    if (fileType == "action") {
+        fileUrl := actionFileUrl
+    }
+    if (fileType == "setting") {
+        fileUrl := iniFileUrl
+    }
+    if !FileExist(fileUrl) {
+        MsgBox("找不到檔案：`n" fileUrl, "錯誤", 16)
+        return
+    }
+
+    ; 使用編輯器開啟 action.ahk2
+    try {
+        Run('notepad.exe "' fileUrl '"')
+    } catch as err {
+        MsgBox("無法開啟檔案：`n" fileUrl "`n`n原因：" err.Message, "錯誤", 16)
+    }
+}
+
+; --- 重置檔案 ---
+ResetFile(fileType, *) {
+    global SRC_DIR, actionFileUrl, iniFileUrl
+    defaultActionFile := SRC_DIR "\reset\default_action.ahk2"
+    defaultIniFile := SRC_DIR "\reset\default_setting.ini"
+
+    if (fileType == "action") {
+        ResetFileCore(defaultActionFile, actionFileUrl, "動作檔")
+        return
+    }
+    if (fileType == "setting") {
+        ResetFileCore(defaultIniFile, iniFileUrl, "設定檔")
+        return
+    }
+    ; 核心邏輯: 確認詢問 & 覆蓋
+    ResetFileCore(defaultFile, targetFile, fileLabel) {
+        result := MsgBox(
+            "確定要重置" fileLabel "嗎?`n`n"
+            . "目標檔案:`n" targetFile "`n`n"
+            . "這會覆蓋目前內容",
+            "確認重置",
+            "OKCancel Icon!"
+        )
+        if (result != "OK") ; 取消
+            return
+        if !FileExist(defaultFile) { ; default檔案不存在，錯誤
+            MsgBox("找不到預設檔案:`n" defaultFile, "錯誤", 16)
+            return
+        }
+
+        ; 覆蓋檔案
+        try {
+            FileCopy(defaultFile, targetFile, 1)
+            MsgBox(fileLabel "已重置，將重新載入腳本", "完成", 64)
+            Reload()
+        } catch as err {
+            MsgBox("重置" fileLabel "失敗：`n" err.Message, "錯誤", 16)
+        }
+    }
+}
+
+; --- 存檔 BTN ---
 ProcessSave(rows) {
     ; ---驗證完整性---
     errorRows := [] ; 用來儲存錯誤紀錄

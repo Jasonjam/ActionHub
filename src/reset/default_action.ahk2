@@ -8,31 +8,8 @@ test__SleepTimer(*) {
     ; 3. 如果是 OneShot，記得關閉 GUI 狀態
     __OneShotDone(A_ThisFunc)
 }
-; === Action區 ===
-firework(*) {
-    Click()
-    Sleep(100)
-    Send("{Space}")
-    Sleep(100)
-}
 
-fish(*) {
-    Send("{2}")
-    __SleepTimer(22500, A_ThisFunc, "press 2")
-}
-
-pressF(*) {
-    Send("{f}")
-    sleep(100)
-}
-
-Boss_snakeBoss(*) {
-    Send("{r}")
-    Sleep(800)
-
-    Click
-    Sleep(1300)
-
-    ; __OneShotDone(A_ThisFunc)
+test__MsgBox(*) {
+    MsgBox("This is an test message box")
 }
 ; === 編輯區，結束 ===
