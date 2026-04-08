@@ -20,6 +20,11 @@ Tray := A_TrayMenu ; 取得托盤選單物件
 Tray.Delete() ; 清除預設的選單項目（如 Suspend, Pause）
 
 ; 加入自定義項目
+Tray.Add("ActionHub", (*) => 0)
+Tray.Disable("1&") ; 灰字 + 不能點
+
+Tray.Add() ; 分隔線
+
 Tray.Add("打開主視窗", (*) => mainGui.Show())
 
 Tray.Add() ; ---分隔線---
