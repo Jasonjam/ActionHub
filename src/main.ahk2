@@ -13,8 +13,30 @@ if !A_IsAdmin {
     }
     ExitApp()
 }
+; --- 專案路徑初始化 ---
+global ROOT_DIR := A_ScriptDir
+if (!A_IsCompiled) { ; 如果非exe=執行main.ahk，把路徑拉到src的上一層
+    loop files, A_ScriptDir "\..", "D"
+        APP_ROOT := A_LoopFileFullPath
+}
+global SRC_DIR := APP_ROOT "\src"
+global ASSET_DIR := APP_ROOT "\assets"
 
-; --- 系統托盤選單配置 ---
+; --- Tray Icon ---
+global trayIcon := ASSET_DIR "\app_icon.ico"
+global trayIcon_suspend := ASSET_DIR "\app_icon_suspend.ico"
+; 檢查 檔案是否存在
+if !FileExist(trayIcon) {
+    MsgBox("找不到 TrayIconOn:n" trayIcon, "Icon Error", 16)
+    ExitApp()
+}
+if !FileExist(trayIcon_suspend) {
+    MsgBox("找不到 TrayIconOff:n" trayIcon_suspend, "Icon Error", 16)
+    ExitApp()
+}
+TraySetIcon(trayIcon) ; 設定托盤圖示
+
+; --- Tray 系統托盤選單配置 ---
 A_IconTip := "ActionHub" ; 設定托盤圖示的提示文字
 Tray := A_TrayMenu ; 取得托盤選單物件
 Tray.Delete() ; 清除預設的選單項目（如 Suspend, Pause）
@@ -22,18 +44,15 @@ Tray.Delete() ; 清除預設的選單項目（如 Suspend, Pause）
 ; 加入自定義項目
 Tray.Add("ActionHub", (*) => 0)
 Tray.Disable("1&") ; 灰字 + 不能點
-
 Tray.Add() ; 分隔線
 
 Tray.Add("打開主視窗", (*) => mainGui.Show())
-
 Tray.Add() ; ---分隔線---
 
 subMenu_edit := Menu() ; 定義 子選單
 subMenu_edit.Add("編輯動作檔", EditFile.Bind("action"))
 subMenu_edit.Add("編輯設定檔", EditFile.Bind("setting"))
 Tray.Add("編輯", subMenu_edit)  ; 渲染 子選單
-
 Tray.Add() ; ---分隔線---
 
 subMenu_reset := Menu() ; 定義 子選單
@@ -43,22 +62,17 @@ subMenu_reset.Add() ; ---分隔線---
 subMenu_reset.Add("重置動作檔(Action Func)", ResetFile.Bind("action"))
 subMenu_reset.Add("重置設定檔(視窗 && 熱鍵)", ResetFile.Bind("setting"))
 Tray.Add("重置 (警告)", subMenu_reset)  ; 渲染 子選單
-
 Tray.Add() ; ---分隔線---
 
+suspendLabel := "鎖定熱鍵 (C+F8)"
+Tray.Add(suspendLabel, ToggleSuspend)
 Tray.Add("重新載入腳本", (*) => Reload())
 Tray.Add("退出程式", (*) => ExitApp())
 
 ; 設定點擊托盤圖示兩下的預設動作
 Tray.Default := "打開主視窗"
 
-; --- 初始化資料與讀取 INI ---
-global SRC_DIR := A_ScriptDir
-
-if (A_IsCompiled) {
-    ; EXE 在根目錄，所以要補上 \src
-    SRC_DIR := A_ScriptDir "\src"
-}
+; --- 讀取 INI ---
 iniFileUrl := SRC_DIR "\setting.ini"
 actionFileUrl := SRC_DIR "\action.ahk2"
 hotkeyMap := Map() ; 存儲ini的熱鍵與函式名
@@ -203,8 +217,11 @@ btnPin.OnEvent("Click", ChangeAOT)
 ; setting按鍵
 btnSetting.OnEvent("Click", ShowSettingGui)
 
-; --- FUNC區 ----
+; --- 快速 FUNC 區 ----
 RCtrl & F5:: Reload() ; 強制重啟
+#SuspendExempt ; 讓Suspend狀態下，這個熱鍵依然有效
+RCtrl & F8:: ToggleSuspend()
+#SuspendExempt False
 
 ; 儲存視窗的狀態，包含:位置, AOT狀態
 SaveStatus() {
@@ -254,8 +271,8 @@ UpdateGUIStatus(actionName, isRunning) {
 ToggleAction(actionName, intervalMs := 100, *) {
     global ActionFnStatus, isSettingOpen
 
-    ; --- 關鍵攔截：如果設定頁面開著，直接結束不執行 ---
-    if (isSettingOpen)
+    ; --- 關鍵攔截：如果設定頁面開著 || 暫停狀態中，直接結束不執行 ---
+    if (isSettingOpen || A_IsSuspended)
         return
 
     ; 1. 初始化狀態 (如果沒跑過)
@@ -692,5 +709,25 @@ ProcessSave(rows) {
         ; 移除最後一個換行符，保持乾淨
         return RTrim(formattedString, "`n`r")
 
+    }
+}
+
+; --- 切換 鎖定熱鍵 狀態 ---
+ToggleSuspend(*) {
+    global suspendLabel, trayIcon_suspend, trayIcon
+    Suspend(-1) ; 切換掛起狀態 (-1 代表 Toggle)
+
+    if (A_IsSuspended) {
+        ; 當進入掛起狀態時：
+        A_TrayMenu.Check(suspendLabel) ; 在選單項目前面打勾
+        __ShowTip("熱鍵已暫停 (Suspend ON)", 1000)
+
+        TraySetIcon(trayIcon_suspend, , true) ; 切換托盤圖示
+    } else {
+        ; 當恢復正常狀態時：
+        A_TrayMenu.Uncheck(suspendLabel)
+        __ShowTip("熱鍵已恢復 (Suspend OFF)", 1000)
+
+        TraySetIcon(trayIcon) ; 恢復托盤圖示
     }
 }
