@@ -14,8 +14,8 @@ if !A_IsAdmin {
     ExitApp()
 }
 ; --- 專案路徑初始化 ---
-global ROOT_DIR := A_ScriptDir
-if (!A_IsCompiled) { ; 如果非exe=執行main.ahk，把路徑拉到src的上一層
+global APP_ROOT := A_ScriptDir
+if (!A_IsCompiled) { ; 如果非exe = 是main.ahk，把路徑拉到src的上一層
     loop files, A_ScriptDir "\..", "D"
         APP_ROOT := A_LoopFileFullPath
 }
