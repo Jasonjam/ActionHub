@@ -73,23 +73,23 @@ Tray.Add("退出程式", (*) => ExitApp())
 Tray.Default := "打開主視窗"
 
 ; --- 讀取 INI ---
-iniFileUrl := SRC_DIR "\setting.ini"
-actionFileUrl := SRC_DIR "\action.ahk2"
+iniFilePath := SRC_DIR "\setting.ini"
+actionFilePath := SRC_DIR "\action.ahk2"
 hotkeyMap := Map() ; 存儲ini的熱鍵與函式名
 global ActionFnStatus := Map() ; 紀錄 action 是否運作
 global isSettingOpen := false
 
 ; 讀取視窗位置與 Pin 狀態
-savedPos := IniRead(iniFileUrl, "Window", "Pos", "xCenter yCenter")
-savedAOT := IniRead(iniFileUrl, "Window", "AlwaysOnTop", "ON") ; 預設為 ON
+savedPos := IniRead(iniFilePath, "Window", "Pos", "xCenter yCenter")
+savedAOT := IniRead(iniFilePath, "Window", "AlwaysOnTop", "ON") ; 預設為 ON
 
 ; --- 決定要讀取的 Section ---
 ; 先看有沒有使用者自訂的 [Hotkey]，沒有就讀預設的 [default-hotkey]
 try {
-    sectionText := IniRead(iniFileUrl, "Hotkey")
+    sectionText := IniRead(iniFilePath, "Hotkey")
 } catch {
     try {
-        sectionText := IniRead(iniFileUrl, "default-hotkey")
+        sectionText := IniRead(iniFilePath, "default-hotkey")
     } catch {
         sectionText := "" ; 如果連預設都沒，就給空字串
     }
@@ -228,11 +228,11 @@ SaveStatus() {
     ; 取得座標
     mainGui.GetPos(&x, &y)
     if (x > -3000) { ; 避開最小化狀態
-        IniWrite("x" x " y" y, iniFileUrl, "Window", "Pos")
+        IniWrite("x" x " y" y, iniFilePath, "Window", "Pos")
     }
     ; 取得並儲存 Pin 狀態 (從按鈕文字判斷最直覺), AOT=Always On Top
     AOTStatus := InStr(btnPin.Text, "ON") ? "ON" : "OFF"
-    IniWrite(AOTStatus, iniFileUrl, "Window", "AlwaysOnTop")
+    IniWrite(AOTStatus, iniFilePath, "Window", "AlwaysOnTop")
 }
 
 ; Always On Top的開關
@@ -554,40 +554,40 @@ ScanActions() {
 
 ; --- 編輯檔案 ---
 EditFile(fileType, *) {
-    global actionFileUrl, iniFileUrl
+    global actionFilePath, iniFilePath
 
     ; 偵測 變數: 開啟的檔案
     if (fileType == "action") {
-        fileUrl := actionFileUrl
+        FilePath := actionFilePath
     }
     if (fileType == "setting") {
-        fileUrl := iniFileUrl
+        FilePath := iniFilePath
     }
-    if !FileExist(fileUrl) {
-        MsgBox("找不到檔案：`n" fileUrl, "錯誤", 16)
+    if !FileExist(FilePath) {
+        MsgBox("找不到檔案：`n" FilePath, "錯誤", 16)
         return
     }
 
     ; 使用編輯器開啟 action.ahk2
     try {
-        Run('notepad.exe "' fileUrl '"')
+        Run('notepad.exe "' FilePath '"')
     } catch as err {
-        MsgBox("無法開啟檔案：`n" fileUrl "`n`n原因：" err.Message, "錯誤", 16)
+        MsgBox("無法開啟檔案：`n" FilePath "`n`n原因：" err.Message, "錯誤", 16)
     }
 }
 
 ; --- 重置檔案 ---
 ResetFile(fileType, *) {
-    global SRC_DIR, actionFileUrl, iniFileUrl
+    global SRC_DIR, actionFilePath, iniFilePath
     defaultActionFile := SRC_DIR "\reset\default_action.ahk2"
     defaultIniFile := SRC_DIR "\reset\default_setting.ini"
 
     if (fileType == "action") {
-        ResetFileCore(defaultActionFile, actionFileUrl, "動作檔")
+        ResetFileCore(defaultActionFile, actionFilePath, "動作檔")
         return
     }
     if (fileType == "setting") {
-        ResetFileCore(defaultIniFile, iniFileUrl, "設定檔")
+        ResetFileCore(defaultIniFile, iniFilePath, "設定檔")
         return
     }
     ; 核心邏輯: 確認詢問 & 覆蓋
@@ -662,10 +662,10 @@ ProcessSave(rows) {
 
     ; 3. 寫入 INI (使用 IniWrite)
     ; 先刪除舊的 Section 確保乾淨
-    IniDelete(iniFileUrl, "Hotkey")
+    IniDelete(iniFilePath, "Hotkey")
 
     ; 這裡寫入處理好的大字串
-    IniWrite(finalData, iniFileUrl, "Hotkey")
+    IniWrite(finalData, iniFilePath, "Hotkey")
 
     ; MsgBox("儲存成功！工具將重新啟動。", "系統提示", "Iconi")
     Reload()
