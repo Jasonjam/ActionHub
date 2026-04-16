@@ -12,6 +12,21 @@ set "ICON=assets\app_icon.ico"
 set "OUT_EXE=.\ActionHub.exe"
 set "SOURCE=src\main.ahk2"
 
+
+:: 訊息輸出設定
+echo ===========================
+echo     ActionHub  編譯器
+echo     ActionHub Compiler
+echo ===========================
+echo.
+echo   遇到黃色警告 Warning，請按確定
+echo   If yellow warnings appear, click OK.
+echo.
+echo.
+
+:: 延遲1秒
+timeout /t 2 /nobreak >nul
+
 echo [1/2] 找尋並清理舊的 exe 檔案...
 echo       Search old version exe and delete it.
 echo.
@@ -20,7 +35,7 @@ if exist "%OUT_EXE%" del "%OUT_EXE%"
 :: 延遲1秒
 timeout /t 1 /nobreak >nul
 
-echo [2/2] 正在進行靜默編譯...，黃色 Warning，按下確定即可
+echo [2/2] 編譯中...，黃色 Warning，請按確定
 echo       Compiling... If yellow warnings appear, click OK.
 echo.
 
@@ -33,8 +48,8 @@ timeout /t 1 /nobreak >nul
 if %ERRORLEVEL% EQU 0 (
     echo.
     echo ========================================
-    echo   編譯成功! 產出檔案: ActionHub.exe
-    echo   Success! Created: ActionHub.exe
+    echo    編譯成功! 產出檔案: ActionHub.exe
+    echo    Success! Created: ActionHub.exe
     echo ========================================
     echo.
     echo 按下任何鍵可關閉
