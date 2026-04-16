@@ -10,7 +10,7 @@ set "COMPILER=tools\Ahk2Exe\Ahk2Exe.ahk"
 set "V2_BASE=tools\AutoHotkey64_v2.exe"
 set "ICON=assets\app_icon.ico"
 set "OUT_EXE=.\ActionHub.exe"
-set "SOURCE=src\main.ahk2"
+set "SOURCE=src\main.ahk"
 
 
 :: 訊息輸出設定

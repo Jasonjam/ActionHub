@@ -1,7 +1,7 @@
 #SingleInstance Force
 #Requires AutoHotkey v2
-#Include action_lib.ahk2
-#Include action.ahk2
+#Include action_lib.ahk
+#Include action.ahk
 
 ; ---- 管理員模式檢查 (v2 轉檔相容版) ----
 if !A_IsAdmin {
@@ -74,7 +74,7 @@ Tray.Default := "打開主視窗"
 
 ; --- 讀取 INI ---
 iniFilePath := SRC_DIR "\setting.ini"
-actionFilePath := SRC_DIR "\action.ahk2"
+actionFilePath := SRC_DIR "\action.ahk"
 hotkeyMap := Map() ; 存儲ini的熱鍵與函式名
 global ActionFnStatus := Map() ; 紀錄 action 是否運作
 global isSettingOpen := false
@@ -531,7 +531,7 @@ ShowSettingGui(*) {
 
 ScanActions() {
     global SRC_DIR ; 抓變數
-    actionFile := SRC_DIR "\action.ahk2"
+    actionFile := SRC_DIR "\action.ahk"
     if !FileExist(actionFile)
         return [] ; 萬一檔案不存在，回傳一個預設值
 
@@ -568,7 +568,7 @@ EditFile(fileType, *) {
         return
     }
 
-    ; 使用編輯器開啟 action.ahk2
+    ; 使用編輯器開啟 action.ahk
     try {
         Run('notepad.exe "' FilePath '"')
     } catch as err {
@@ -579,7 +579,7 @@ EditFile(fileType, *) {
 ; --- 重置檔案 ---
 ResetFile(fileType, *) {
     global SRC_DIR, actionFilePath, iniFilePath
-    defaultActionFile := SRC_DIR "\reset\default_action.ahk2"
+    defaultActionFile := SRC_DIR "\reset\default_action.ahk"
     defaultIniFile := SRC_DIR "\reset\default_setting.ini"
 
     if (fileType == "action") {
