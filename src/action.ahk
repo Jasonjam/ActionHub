@@ -8,7 +8,12 @@ test__SleepTimer(*) {
     ; 3. 如果是 OneShot，記得關閉 GUI 狀態
     __OneShotDone(A_ThisFunc)
 }
-; === Action區 ===
+
+left_Click(*) {
+    Click()
+    Sleep(100)
+}
+
 firework(*) {
     Click()
     Sleep(100)
@@ -35,4 +40,5 @@ Boss_snakeBoss(*) {
 
     ; __OneShotDone(A_ThisFunc)
 }
+
 ; === 編輯區，結束 ===
