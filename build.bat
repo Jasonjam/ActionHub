@@ -5,9 +5,9 @@ chcp 65001 >nul
 cd /d "%~dp0"
 
 :: --- 核心路徑鎖定 (全部轉為絕對路徑) ---
-set "V1_ENGINE=tools\AHK_V1_Engine.exe"
-set "COMPILER=tools\Ahk2Exe\Ahk2Exe.ahk"
-set "V2_BASE=tools\AutoHotkey64_v2.exe"
+set "V1_ENGINE=tools\AutoHotkey\AutohotkeyU64.exe"
+set "COMPILER=tools\AutoHotkey\Compiler\Ahk2Exe.ahk"
+set "V2_BASE=tools\AutoHotkey\AutoHotkey64.exe"
 set "ICON=assets\app_icon.ico"
 set "OUT_EXE=.\ActionHub.exe"
 set "SOURCE=src\main.ahk"
@@ -19,13 +19,13 @@ echo     ActionHub  編譯器
 echo     ActionHub Compiler
 echo ===========================
 echo.
-echo   遇到黃色警告 Warning，請按確定
+echo   若有黃色警告 Warning，請按確定
 echo   If yellow warnings appear, click OK.
 echo.
 echo.
 
 :: 延遲1秒
-timeout /t 2 /nobreak >nul
+timeout /t 1 /nobreak >nul
 
 echo [1/2] 找尋並清理舊的 exe 檔案...
 echo       Search old version exe and delete it.
@@ -35,7 +35,7 @@ if exist "%OUT_EXE%" del "%OUT_EXE%"
 :: 延遲1秒
 timeout /t 1 /nobreak >nul
 
-echo [2/2] 編譯中...，黃色 Warning，請按確定
+echo [2/2] 編譯中...，若有黃色 Warning，請按確定
 echo       Compiling... If yellow warnings appear, click OK.
 echo.
 
