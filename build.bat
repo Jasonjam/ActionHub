@@ -31,6 +31,8 @@ echo [1/3] 檢查 ActionHub.exe 是否正在執行...
 echo       Checking if ActionHub.exe is running...
 echo.
 
+timeout /t 1 /nobreak >nul
+
 :WAIT_ACTIONHUB_CLOSE
 tasklist /FI "IMAGENAME eq ActionHub.exe" | find /I "ActionHub.exe" >nul
 
@@ -50,8 +52,8 @@ if %ERRORLEVEL% EQU 0 (
     goto WAIT_ACTIONHUB_CLOSE
 )
 
-echo 已確認 ActionHub.exe 未執行
-echo Confirmed ActionHub.exe is not running.
+echo       已確認 ActionHub.exe 未執行
+echo       Confirmed ActionHub.exe is not running.
 echo.
 
 timeout /t 1 /nobreak >nul
@@ -60,6 +62,7 @@ echo [2/3] 找尋並清理舊的 exe 檔案...
 echo       Search old version exe and delete it.
 echo.
 if exist "%OUT_EXE%" del "%OUT_EXE%"
+echo.
 
 :: 延遲1秒
 timeout /t 1 /nobreak >nul
