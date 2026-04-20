@@ -22,9 +22,9 @@ jobs:
                   echo "開始還原預設檔案..."
 
                   # 從 src/reset/ 把範本覆蓋回去
-                  # 假設你的範本檔名分別是 action.ahk 和 setting.ini
-                  cp src/reset/default_action.ahk ./action.ahk
-                  cp src/reset/default_setting.ini src/setting.ini
+                  # 強制覆蓋 (加上 -f) 避免提示
+                  cp -f src/reset/default_action.ahk src/action.ahk
+                  cp -f src/reset/default_setting.ini src/setting.ini
 
                   echo "還原完成。"
 
@@ -34,10 +34,10 @@ jobs:
                   git config --local user.name "github-actions[bot]"
 
                   # 檢查是否有變動，有的話才提交
-                  git add Action.ahk src/setting.ini
+                  git add src/action.ahk src/setting.ini
                   if git diff --staged --quiet; then
                     echo "檔案內容已是預設值，無需更新。"
                   else
-                    git commit -m "chore: [Automated] 重置 Action.ahk 與設定檔為範本狀態"
+                    git commit -m "chore: [Automated] 重置 action.ahk 與設定檔為範本狀態"
                     git push
                   fi
