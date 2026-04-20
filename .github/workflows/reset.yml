@@ -1,0 +1,43 @@
+name: Reset ActionHub Files
+
+# 當 push 到 main 分支時觸發 (或是你測試時想在 feat 分支觸發也可以加上去)
+on:
+    push:
+        branches: [main, feat/reset-workflow]
+
+jobs:
+    reset-files:
+        runs-on: ubuntu-latest
+
+        # 賦予 Action 寫入權限
+        permissions:
+            contents: write
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Restore default files
+              run: |
+                  echo "開始還原預設檔案..."
+
+                  # 從 src/reset/ 把範本覆蓋回去
+                  # 強制覆蓋 (加上 -f) 避免提示
+                  cp -f src/reset/default_action.ahk src/action.ahk
+                  cp -f src/reset/default_setting.ini src/setting.ini
+
+                  echo "還原完成。"
+
+            - name: Commit and Push changes
+              run: |
+                  git config --local user.email "github-actions[bot]@users.noreply.github.com"
+                  git config --local user.name "github-actions[bot]"
+
+                  # 檢查是否有變動，有的話才提交
+                  git add src/action.ahk src/setting.ini
+                  if git diff --staged --quiet; then
+                    echo "檔案內容已是預設值，無需更新。"
+                  else
+                    git commit -m "chore: [Automated] 重置 action.ahk 與設定檔為範本狀態"
+                    git push
+                  fi
