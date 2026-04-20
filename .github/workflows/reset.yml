@@ -22,9 +22,9 @@ jobs:
                   echo "開始還原預設檔案..."
 
                   # 從 src/reset/ 把範本覆蓋回去
-                  # 假設你的範本檔名分別是 Action.ahk 和 setting.ini
-                  cp src/reset/Action.ahk ./Action.ahk
-                  cp src/reset/setting.ini src/setting.ini
+                  # 假設你的範本檔名分別是 action.ahk 和 setting.ini
+                  cp src/reset/default_action.ahk ./action.ahk
+                  cp src/reset/default_setting.ini src/setting.ini
 
                   echo "還原完成。"
 
