@@ -3,7 +3,7 @@ name: Reset ActionHub Files
 # 當 push 到 main 分支時觸發 (或是你測試時想在 feat 分支觸發也可以加上去)
 on:
     push:
-        branches: [main, feat/reset-workflow]
+        branches: [main]
 
 jobs:
     reset-files:
