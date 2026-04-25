@@ -3,6 +3,7 @@
 ## personal 分支
 
 拿來自己使用，會有平常使用的腳本紀錄
+拿新功能，是到這個`personal`分支`merge main`
 
 ### 強制追蹤 action.ahk & setting.ini
 
