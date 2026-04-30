@@ -18,6 +18,13 @@ setlocal enabledelayedexpansion
 set "TOTAL_STEPS=4"
 set "CUR=0"
 
+:: 預設等待秒數
+set "WAIT_SEC=1"
+
+:: 如果已經有舊的 EXE，代表不是第一次執行，略過等待
+if exist "%OUT_EXE%" (
+    set "WAIT_SEC=0"
+)
 
 :: 訊息輸出
 echo ===========================
@@ -25,12 +32,10 @@ echo     ActionHub  編譯器
 echo     ActionHub Compiler
 echo ===========================
 echo.
-echo   若有黃色警告 Warning，請按確定
-echo   If yellow warnings appear, click OK.
 echo.
 echo.
 :: 延遲1秒
-timeout /t 1 /nobreak >nul
+call :wait
 
 :: === 檢查環境並初始化 ===
 set "FIRST_BUILD=0"
@@ -38,14 +43,14 @@ call :step 檢查環境並初始化...
 echo       Checking environment and initializing...
 echo.
 :: 延遲1秒
-timeout /t 1 /nobreak >nul
+call :wait
 
 :: 檢查 action.ahk
 echo       開始檢查設定檔 action.ahk...
 echo       Starting to check config file action.ahk...
 echo.
 :: 延遲1秒
-timeout /t 1 /nobreak >nul
+call :wait
 
 if not exist "src\action.ahk" (
     if exist "src\action.ahk.template" (
@@ -55,7 +60,7 @@ if not exist "src\action.ahk" (
         echo.
         set "FIRST_BUILD=1"
         :: 延遲1秒
-        timeout /t 1 /nobreak >nul
+        call :wait
     )
 )
 
@@ -65,7 +70,7 @@ echo       開始檢查設定檔 setting.ini...
 echo       Starting to check config file setting.ini...
 echo.
 :: 延遲1秒
-timeout /t 1 /nobreak >nul
+call :wait
 
 if not exist "src\setting.ini" (
     if exist "src\setting.ini.template" (
@@ -75,7 +80,7 @@ if not exist "src\setting.ini" (
         echo.
         set "FIRST_BUILD=1"
         :: 延遲1秒
-        timeout /t 1 /nobreak >nul
+        call :wait
     )
 )
 
@@ -88,14 +93,14 @@ if "%FIRST_BUILD%"=="1" (
 )
 echo.
 :: 延遲1秒
-timeout /t 1 /nobreak >nul
+call :wait
 
 :: === 檢查是否正在執行 ActionHub.exe ===
 call :step 檢查 ActionHub.exe 是否正在執行...
 echo       Checking if ActionHub.exe is running...
 echo.
 :: 延遲1秒
-timeout /t 1 /nobreak >nul
+call :wait
 
 :WAIT_ACTIONHUB_CLOSE
 tasklist /FI "IMAGENAME eq ActionHub.exe" | find /I "ActionHub.exe" >nul
@@ -120,29 +125,29 @@ echo       已確認 ActionHub.exe 未執行
 echo       Confirmed ActionHub.exe is not running.
 echo.
 :: 延遲1秒
-timeout /t 1 /nobreak >nul
+call :wait
 
 :: === 清理舊的 exe 檔案 ===
 call :step 找尋並清理舊的 exe 檔案...
-echo       Search old version exe and delete it.
+echo       Searching old version exe and delete it.
 echo.
 if exist "%OUT_EXE%" del "%OUT_EXE%"
 echo.
-:: 延遲1秒
-timeout /t 1 /nobreak >nul
+:: 延遲2秒，增加延遲，避免刪除後立即進入下一步造成問題
+timeout /t 2 /nobreak >nul
 
 :: === 執行 AHK 編譯 ===
 call :step 編譯中...
 echo       Compiling...
 :: 延遲1秒
-timeout /t 1 /nobreak >nul
+call :wait
 
 echo.
 echo       若有黃色 Warning，請按確定
 echo       If yellow warnings appear, click OK.
 echo.
 :: 延遲1秒
-timeout /t 1 /nobreak >nul
+call :wait
 
 :: 使用引號包覆所有路徑，並確保參數順序正確
 "%V1_ENGINE%" "%COMPILER%" /in "%SOURCE%" /out "%OUT_EXE%" /icon "%ICON%" /base "%V2_BASE%"
@@ -150,8 +155,8 @@ timeout /t 1 /nobreak >nul
 if %ERRORLEVEL% EQU 0 (
     echo.
     echo ========================================
-    echo    編譯成功! 產出檔案: ActionHub.exe
-    echo    Success! Created: ActionHub.exe
+    echo     編譯成功! 產出檔案: ActionHub.exe
+    echo     Success! Created: ActionHub.exe
     echo ========================================
     echo.
     echo 按下任何鍵可關閉
@@ -161,6 +166,15 @@ if %ERRORLEVEL% EQU 0 (
     echo [Error] Compilation failed. Code: %ERRORLEVEL%
 )
 pause
+exit /b
+
+
+
+:: ===== wait 子程序 =====
+:wait
+if !WAIT_SEC! GTR 0 timeout /t !WAIT_SEC! /nobreak >nul
+exit /b
+
 
 :: ===== step 子程序 =====
 :step
