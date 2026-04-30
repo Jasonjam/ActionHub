@@ -1,4 +1,9 @@
+# 輸出產物
 ActionHub.exe
 
+# 個人化檔案
 src/action.ahk
 src/setting.ini
+
+# 分支開發筆記
+DEV_NOTE.md
