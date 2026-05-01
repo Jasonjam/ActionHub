@@ -54,7 +54,6 @@ Tray.Delete() ; 清除預設的選單項目（如 Suspend, Pause）
 ; 加入自定義項目
 Tray.Add("ActionHub", (*) => 0)
 Tray.Disable("1&") ; 灰字 + 不能點
-Tray.Add("HotReload", HotReload) ;;;;;;;;;;; 測試用
 Tray.Add() ; 分隔線
 
 Tray.Add("打開主視窗", (*) => mainGui.Show())
@@ -229,7 +228,7 @@ btnPin.OnEvent("Click", ChangeAOT)
 btnSetting.OnEvent("Click", ShowSettingGui)
 
 ; --- 快速 FUNC 區 ----
-RCtrl & F5:: ReloadHandler() ; 強制重啟
+RCtrl & F5:: HotReload() ; 強制重啟
 #SuspendExempt ; 讓Suspend狀態下，這個熱鍵依然有效
 RCtrl & F8:: ToggleSuspend()
 #SuspendExempt False
@@ -549,12 +548,14 @@ ScanActions() {
     content := FileRead(actionFile, "UTF-8")
     actions := []
 
+    ; 只抓"純英文"開頭的FN
     ; 正則表達式解釋：
     ; m) -> 多行模式
-    ; ^(\w+) -> 每一行開頭的英數單字 (函式名)
+    ; ^\s* -> 行首的空白 (如果有的話)
+    ; ([A-Za-z]\w*) -> 每一行開頭的英數單字 (函式名)
     ; \(\*\) -> 緊接著字串 (*)
     pos := 1
-    while (pos := RegExMatch(content, "m)^(\w+)\(\*\)", &match, pos)) {
+    while (pos := RegExMatch(content, "m)^\s*([A-Za-z]\w*)\(\*\)", &match, pos)) {
         actions.Push(match[1]) ; 存入陣列
         pos += match.Len ; 往後繼續找
 
