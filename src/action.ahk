@@ -123,7 +123,9 @@ DPS_Sword_Lv5(*) {
     Sleep(500)
 
     Send("4")
-    __SleepTimer(10000, actionName, "4") ; 修正這行
+    __SleepTimer(10000, actionName, "4")
+    
+    __OneShotDone(A_ThisFunc)
 }
 
 

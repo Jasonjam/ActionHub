@@ -27,14 +27,14 @@ __SwordQi(actionFnName) {
 
 __Spear(actionName) {
     Send("{WheelDown 1}")
-    __SleepTimer(200, A_ThisFunc, "W down")
+    __SleepTimer(200, actionName, "W down")
 
     Send("q")
-    __SleepTimer(300, A_ThisFunc, "q")
+    __SleepTimer(300, actionName, "q")
 
     Send("e")
-    __SleepTimer(200, A_ThisFunc, "e")
+    __SleepTimer(200, actionName, "e")
 
     Send("{WheelDown 1}")
-    __SleepTimer(200, A_ThisFunc, "W down")
+    __SleepTimer(200, actionName, "W down")
 }
