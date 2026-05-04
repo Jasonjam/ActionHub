@@ -2,6 +2,7 @@
 #Requires AutoHotkey v2
 #Include action_lib.ahk
 #Include action.ahk
+#MaxThreadsPerHotkey 2
 
 ; ---- 管理員模式檢查 (v2 轉檔相容版) ----
 if !A_IsAdmin {
@@ -196,9 +197,10 @@ for index, hk in guiHotkeyList {
 
     ; --- Action 顯示: 欄位與狀態標記 ---
     if (info.isBindMap == 1) {
-        ; A. 成功綁定的情況：黑字、紅色 X、加入連動 Map
-        mainGui.Add("Text", "x140 y" yPos " w130 cBlack", info.act)
-        statusControls[info.act] := mainGui.Add("Text", "x290 y" yPos " w40 cRed", "X")
+        ; A. 成功綁定的情況：黑字ActionName、紅X、加入連動 Map
+        mainGui.Add("Text", "x140 y" yPos " w130 cBlack", info.act) ;Action 欄位
+        statusControls[info.act] := mainGui.Add("Text", "x290 y" yPos " w40 cRed", "X") ; 狀態欄位，預設紅X
+        UpdateGUIStatus(info.act, false) ; 初始化狀態為 false (紅X)，之後會根據實際狀態更新
     }
     if (info.isBindMap == 0) {
         ; B. 綁定失敗的情況：灰字、灰色驚嘆號、不加入 Map
@@ -268,10 +270,11 @@ UpdateGUIStatus(actionName, isRunning) {
     if (statusControls.Has(actionName)) {
         ctrl := statusControls[actionName]
         if (isRunning) {
-            ctrl.SetFont("cGreen s11 bold") ; 啟動時加粗更明顯
+            ctrl.SetFont("cGreen s11 Bold")  ; 啟動時加粗更明顯
             ctrl.Value := "O"
-        } else {
-            ctrl.SetFont("cRed s10 norm")
+        } 
+        if(!isRunning) {
+            ctrl.SetFont("cRed s11 norm")  ; 關閉時恢復紅色和正常字重
             ctrl.Value := "X"
         }
     }
@@ -295,18 +298,22 @@ ToggleAction(actionName, intervalMs := 100, *) {
     ; 取得函式物件
     fn := %actionName%
 
+    ; --- 熱鍵開啟 ---
     if (ActionFnStatus[actionName]) {
-        ; --- 開啟模式 ---
-        SetTimer(fn, intervalMs)     ; 按照間隔重複執行
+        ; 這邊用 SetTimer 來操作 ActionFunc()，SetTimer(Func, ms) 會每隔 ms 毫秒呼叫一次 Func
+        UpdateGUIStatus(actionName, true)  ; GUI 變綠 O 
         __ShowTip(actionName " : ON (" intervalMs "ms)") ; 啟動時, tooltip 提示
-        UpdateGUIStatus(actionName, true)  ; GUI 變綠 O
+        Sleep(-1)  ; 讓 GUI / Tooltip 有機會先重繪
+
+        SetTimer(fn, intervalMs)  ; 開始執行 Action，之後每 intervalMs ms 重複執行
     }
+    ; --- 熱鍵關閉 ---
     if (!ActionFnStatus[actionName]) {
-        ; --- 關閉模式 ---
-        SetTimer(fn, 0)              ; 停止 Timer
+        SetTimer(fn, 0)              ; 停止 Timer，停止下一輪動作
         ToolTip()                    ; 清空可能殘留的 SleepTimer 倒數文字
-        __ShowTip(actionName " : OFF", 1000) ; 關閉時, tooltip 提示
-        UpdateGUIStatus(actionName, false) ; GUI 變紅 X
+        UpdateGUIStatus(actionName, false)  ; GUI 變紅 X
+        __ShowTip(actionName " : OFF", 1000)  ; 關閉時, tooltip 提示
+        
     }
 }
 
