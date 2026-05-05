@@ -37,7 +37,6 @@ PoisonTower(*) {
 }
 ; === 毒塔結束 ===
 
-
 ; === 超級凌雲踏 ===
 UltraJump(*) {
     Send("{Esc}")
@@ -67,7 +66,6 @@ Firework(*) {
 ; === 搶煙火結束 ===
 
 ; === 木樁測DPS ===
-#include dummyDPS_fn_helper.ahk
 ; 無名劍心法5重用
 DPS_Sword_Lv5(*) {
     actionName := A_ThisFunc
@@ -124,12 +122,57 @@ DPS_Sword_Lv5(*) {
 
     Send("4")
     __SleepTimer(10000, actionName, "4")
-    
+
     __OneShotDone(A_ThisFunc)
 }
-
-
 
 ; DPS_Sword_Lv6() {
 ;     ; 6 級的無名劍心法，之後再調整
 ; }
+
+; --- DPS 通用FN ---
+__ThreeSwordQi(actionFnName) {
+    Send("{r down}")
+    __SleepTimer(1550, actionFnName, "R 1")
+    Send("{r up}")
+    __SleepTimer(800, actionFnName, "R 1 end")
+
+    Send("{r down}")
+    __SleepTimer(1550, actionFnName, "R 2")
+    Send("{r up}")
+    __SleepTimer(800, actionFnName, "R 2 end")
+
+    Send("{r down}")
+    __SleepTimer(1550, actionFnName, "R 3")
+    Send("{r up}")
+    __SleepTimer(900, actionFnName, "R 3 end")
+}
+
+__SwordQi(actionFnName) {
+    Send("{r down}")
+    __SleepTimer(1600, actionFnName, "R")
+    Send("{r up}")
+    __SleepTimer(900, actionFnName, "R end")
+}
+
+__Spear(actionName) {
+    Send("{WheelDown 1}")
+    __SleepTimer(200, actionName, "W down")
+
+    Send("q")
+    __SleepTimer(300, actionName, "q")
+
+    Send("e")
+    __SleepTimer(200, actionName, "e")
+
+    Send("{WheelDown 1}")
+    __SleepTimer(200, actionName, "W down")
+}
+; === 木樁測DPS結束 ===
+
+; === 滑鼠座標 ===
+MouseCoord(*) {
+    MouseGetPos(&x, &y)
+    MsgBox("滑鼠座標: " . x . ", " . y)
+}
+; === 滑鼠座標結束 ===
