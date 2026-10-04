@@ -3,9 +3,9 @@ RCtrl & 1 = test__SleepTimer
 RAlt & 1 = test__MsgBox
 ;----------
 [System]
-LastActionTime=0
+LastActionTime=
 ;----------
 [Window]
 Pos=
-AlwaysOnTop=ON
+AlwaysOnTop=
 ;----------

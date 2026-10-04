@@ -1,0 +1,137 @@
+#!/bin/sh
+
+echo ""
+echo "========== PUSH 前處理 =========="
+
+ACTION_RUNTIME="src/action.ahk"
+ACTION_TEMPLATE="src/action.ahk.template"
+SETTING_RUNTIME="src/setting.ini"
+SETTING_TEMPLATE="src/setting.ini.template"
+SETTING_DEFAULT="src/reset/default_setting.ini"
+
+# Runtime 存在時，先轉回 Template 狀態
+if [ -f "$ACTION_RUNTIME" ]; then
+    mv -f "$ACTION_RUNTIME" "$ACTION_TEMPLATE"
+    echo "✓ action.ahk → action.ahk.template"
+fi
+
+if [ -f "$SETTING_RUNTIME" ]; then
+    mv -f "$SETTING_RUNTIME" "$SETTING_TEMPLATE"
+    echo "✓ setting.ini → setting.ini.template"
+
+    # [default-hotkey] 保留範例內容，其餘 Section 清空 Value
+    awk '
+    BEGIN {
+        keep_value = 0
+    }
+
+    /^\[default-hotkey\]$/ {
+        keep_value = 1
+        print
+        next
+    }
+    /^\[/ {
+        keep_value = 0
+        print
+        next
+    }
+
+    {
+        if (!keep_value && $0 ~ /^[^;#][^=]*=/) {
+            sub(/=.*/, "=")
+        }
+
+        print
+    }
+    ' "$SETTING_TEMPLATE" > "$SETTING_TEMPLATE.tmp"
+
+    mv -f "$SETTING_TEMPLATE.tmp" "$SETTING_TEMPLATE"
+    echo "✓ 已清除 setting.ini.template 的 Runtime 設定值"
+fi
+
+# Template 必須存在，Runtime 必須不存在
+if [ ! -f "$ACTION_TEMPLATE" ] || [ ! -f "$SETTING_TEMPLATE" ]; then
+    echo ""
+    echo "[錯誤] Template 檔案不完整，已中止 Push。"
+    exit 1
+fi
+
+if [ -f "$ACTION_RUNTIME" ] || [ -f "$SETTING_RUNTIME" ]; then
+    echo ""
+    echo "[錯誤] Runtime 檔案仍存在，已中止 Push。"
+    exit 1
+fi
+
+# 比較 setting template 與 default 的 Section / Key
+extract_ini_structure() {
+    awk '
+    /^[[:space:]]*\[/ {
+        section = $0
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", section)
+        print section
+        next
+    }
+
+    /^[[:space:]]*[;#]/ {
+        next
+    }
+
+    /=/ {
+        key = $0
+        sub(/=.*/, "", key)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+
+        if (key != "") {
+            print section "|" key
+        }
+    }
+    ' "$1"
+}
+
+TEMPLATE_STRUCTURE="$(mktemp)"
+DEFAULT_STRUCTURE="$(mktemp)"
+
+extract_ini_structure "$SETTING_TEMPLATE" > "$TEMPLATE_STRUCTURE"
+extract_ini_structure "$SETTING_DEFAULT" > "$DEFAULT_STRUCTURE"
+
+STRUCTURE_DIFF="$(diff -u "$TEMPLATE_STRUCTURE" "$DEFAULT_STRUCTURE")"
+DIFF_RESULT=$?
+
+rm -f "$TEMPLATE_STRUCTURE" "$DEFAULT_STRUCTURE"
+
+if [ "$DIFF_RESULT" -ne 0 ]; then
+    echo ""
+    echo "[錯誤] setting.ini.template 與 default_setting.ini 的 Section / Key 不一致。"
+    echo ""
+    echo "$STRUCTURE_DIFF"
+    echo ""
+    echo "請手動更新 src/reset/default_setting.ini 後，再次執行 git push。"
+    echo "PUSH 已中止。"
+    exit 1
+fi
+
+echo "✓ Template / Default 的 Section / Key 一致"
+# 只處理 pre-push 相關檔案，不使用 git add -A
+git add "$ACTION_TEMPLATE" "$SETTING_TEMPLATE" "$SETTING_DEFAULT"
+
+# 有 staged 變更才建立轉換 commit
+if ! git diff --cached --quiet -- "$ACTION_TEMPLATE" "$SETTING_TEMPLATE" "$SETTING_DEFAULT"; then
+    git commit -m "chore: convert templates"
+
+    echo ""
+    echo "================================="
+    echo "✓ Template 轉換完成"
+    echo "✓ 已建立 commit：chore: convert templates"
+    echo ""
+    echo "請再次執行：git push"
+    echo "================================="
+    echo ""
+
+    exit 1
+fi
+
+echo "✓ 專案已是乾淨的 Template 狀態"
+echo "========== 開始 PUSH =========="
+echo ""
+
+exit 0

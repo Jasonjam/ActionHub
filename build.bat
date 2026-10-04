@@ -45,6 +45,11 @@ echo.
 :: 延遲1秒
 call :wait
 
+:: 初始化 Git Hooks
+if exist ".git" (
+    git config --local core.hooksPath .githooks
+)
+
 :: 檢查 action.ahk
 echo       開始檢查設定檔 action.ahk...
 echo       Starting to check config file action.ahk...
