@@ -91,9 +91,9 @@ global ActionFnStatus := Map() ; 紀錄 action 是否運作
 global isActionOpen := false
 global isSettingOpen := false
 
-; 讀取視窗位置與 Pin 狀態
-savedPos := IniRead(iniFilePath, "Window", "Pos", "xCenter yCenter")
-savedAOT := IniRead(iniFilePath, "Window", "AlwaysOnTop", "ON") ; 預設為 ON
+; 讀取 ini 檔案
+currentPos := IniRead(iniFilePath, "Window", "Pos", "xCenter yCenter")
+currentAot := IniRead(iniFilePath, "Window", "AlwaysOnTop", "ON") ; 預設為 ON
 
 ; --- 決定要讀取的 Section ---
 ; 先看有沒有使用者自訂的 [Hotkey]，沒有就讀預設的 [default-hotkey]
@@ -168,8 +168,8 @@ for hk, info in hotkeyMap {
 ; MsgBox(debugText)
 
 ; --- 創建 GUI ---
-; 根據讀取的 savedAOT 決定初始狀態
-aotOption := (savedAOT == "ON") ? "+AlwaysOnTop" : "-AlwaysOnTop"
+; 根據讀取的 currentAot 決定初始狀態
+aotOption := (currentAot == "ON") ? "+AlwaysOnTop" : "-AlwaysOnTop"
 mainGui := Gui(aotOption, "ActionHub")
 mainGui.SetFont("s10", "Microsoft JhengHei")
 
@@ -218,13 +218,13 @@ for index, hk in guiHotkeyList {
 ; --- 顯示GUI ---
 ; 啟動訊息監聽 (監聽滑鼠放開移動結束)
 OnMessage(0x0232, WM_EXITSIZEMOVE)
-mainGui.Show(savedPos " w340")
+mainGui.Show(currentPos " w340")
 
 ; --- BTN事件 ---
 ; 視窗關閉
 mainGui.OnEvent("Close", (*) => (mainGui.Hide()))
 ; reload按鍵
-btnReload.OnEvent("Click", (*) => (SaveStatus(), ReloadHandler()))
+btnReload.OnEvent("Click", (*) => (ReloadHandler()))
 ; setting按鍵
 btnSetting.OnEvent("Click", ShowSettingGui)
 ; action按鍵
@@ -236,34 +236,14 @@ RCtrl & F5:: HotReload() ; 強制重啟
 RCtrl & F8:: ToggleSuspend()
 #SuspendExempt False
 
-; 儲存視窗的狀態，包含:位置, AOT狀態
-SaveStatus() {
-    ; 取得座標
-    mainGui.GetPos(&x, &y)
-    if (x > -3000) { ; 避開最小化狀態
-        IniWrite("x" x " y" y, iniFilePath, "Window", "Pos")
-    }
-    ; 取得並儲存 Pin 狀態 (從按鈕文字判斷最直覺), AOT=Always On Top
-    ; ##### 以後丟進settingpage
-    ; AOTStatus := InStr(btnPin.Text, "ON") ? "ON" : "OFF"
-    ; IniWrite(AOTStatus, iniFilePath, "Window", "AlwaysOnTop")
-}
-
-; Always On Top的開關
-ChangeAOT(btnObj, *) {
-    if InStr(btnObj.Text, "ON") {
-        mainGui.Opt("-AlwaysOnTop")
-        btnObj.Text := "Pin: OFF"
-    } else {
-        mainGui.Opt("+AlwaysOnTop")
-        btnObj.Text := "Pin: ON"
-    }
-}
-
 ; 監聽 移動視窗 這個動作
 WM_EXITSIZEMOVE(wParam, lParam, msg, hwnd) {
     if (hwnd = mainGui.Hwnd) {
-        SaveStatus()
+        mainGui.GetPos(&x, &y) ; 取得座標
+
+        if (x > -3000) { ; 避開最小化狀態
+            IniWrite("x" x " y" y, iniFilePath, "Window", "Pos") ; 儲存視窗的狀態
+        }
     }
 }
 
@@ -427,7 +407,8 @@ ShowActionGui(*) {
 
         ; 排序
         ; 使用 Format("{:02d}.", index) 可以讓 1 變成 01，排版更整齊，第一個Center垂直置中
-        actionGui.Add("Text", MakePos(cfg.noX, currentY, cfg.noW, cfg.rowH, "Center +0x200"), Format("{:02d}.", index))
+        actionGui.Add("Text", MakePos(cfg.noX, currentY, cfg.noW, cfg.rowH, "Center +0x200"), Format("{:02d}.",
+            index))
 
         ; 刪除按鈕 (-)
         row.btnObj := actionGui.Add("Button", MakePos(cfg.delX, currentY, cfg.delW, cfg.rowH), "-")
@@ -591,11 +572,6 @@ ShowSettingGui(*) {
     isSettingOpen := true
     mainGui.Opt("+Disabled")
 
-    ; 取得 Main 座標
-    mainGui.GetPos(&mainX, &mainY, &mainW, &mainH)
-    offsetX := mainX + 50
-    offsetY := mainY + 50
-
     ; 建立 Setting GUI
     settingGui := Gui("-MinimizeBox -MaximizeBox", "Settings")
     settingGui.Opt("+AlwaysOnTop")
@@ -604,18 +580,157 @@ ShowSettingGui(*) {
     ; 關閉事件
     settingGui.OnEvent("Close", (guiObj) => CloseSetting(guiObj))
 
-    ; ===== Setting 內容放這裡 =====
+    ; ===== Setting 內容 =====
+    ; --- 介面佈局配置 ---
+    cfg := {
+        ; --- GUI ---
+        guiW: 280,             ; Setting GUI 整體寬度
+        ; --- 每列 Setting ---
+        startY: 15,            ; 第一列起始 Y
+        rowH: 20,              ; 每列控制項高度
+        spaceH: 5,            ; 控制項底部到分隔線的距離
+        ; --- 左側 Label ---
+        labelX: 20,            ; Label 左側位置
+        labelW: 180,           ; Label 寬度
+        ; --- Checkbox ---
+        checkX: 230,           ; Checkbox 左側位置
+        checkW: 20,            ; Checkbox 寬度
+        ; --- Button ---
+        btnX: 175,             ; Button 左側位置
+        btnW: 70,              ; Button 寬度
+        btnH: 22,              ; Button 高度
+        btnOffsetY: -2,        ; Button 垂直微調，負值往上
+        ; --- 分隔線 ---
+        hrX: 20,               ; 分隔線左側位置
+        hrW: 240,              ; 分隔線寬度
+        hrMB: 20               ; 分隔線到下一列的距離
+    }
 
-    ; 顯示
-    settingGui.Show(Format("x{:d} y{:d} w350", offsetX, offsetY))
+    ; --- Setting Data ---
+    settingItems := [{
+        label: "Always On Top",
+        type: "checkbox",
+        value: currentAot == "ON",
+        handler: ChangeAOT
+    }, {
+        label: "Close in Tray",
+        type: "checkbox",
+        value: true,
+        handler: ChangeTray
+    }, {
+        label: "Backup",
+        type: "button",
+        text: "Backup",
+        handler: BackupSettings
+    }, {
+        label: "Restore",
+        type: "button",
+        text: "Restore",
+        handler: RestoreSettings
+    }]
+    ; --- Setting 模板 (不用改，專注Data就好) ---
+    currentY := cfg.startY
+
+    for item in settingItems {
+        ; 左側名稱
+        settingGui.Add(
+            "Text",
+            Format("x{:d} y{:d} w{:d} h{:d} +0x200",
+                cfg.labelX, currentY, cfg.labelW, cfg.rowH),
+            item.label
+        )
+
+        ; Checkbox
+        if (item.type == "checkbox") {
+            ctrl := settingGui.Add(
+                "CheckBox",
+                Format("x{:d} y{:d} w{:d} h{:d}",
+                    cfg.checkX, currentY, cfg.checkW, cfg.rowH)
+            )
+
+            ctrl.Value := item.value
+            ctrl.OnEvent("Click", item.handler)
+        }
+
+        ; Button
+        if (item.type == "button") {
+            ctrl := settingGui.Add(
+                "Button",
+                Format("x{:d} y{:d} w{:d} h{:d}",
+                    cfg.btnX,
+                    currentY + cfg.btnOffsetY,
+                    cfg.btnW,
+                    cfg.btnH),
+                item.text
+            )
+
+            ctrl.OnEvent("Click", item.handler)
+        }
+
+        ; 移動到控制項下方
+        currentY += cfg.rowH + cfg.spaceH
+
+        ; 分隔線
+        settingGui.Add(
+            "Text",
+            Format("x{:d} y{:d} w{:d} h1 BackgroundGray",
+                cfg.hrX, currentY, cfg.hrW)
+        )
+
+        ; 移動到下一列
+        currentY += cfg.hrMB
+    }
+
+    ; 取得 Main 座標
+    mainGui.GetPos(&mainX, &mainY, &mainW, &mainH)
+    offsetX := mainX + 50
+    offsetY := mainY + 50
+    ; 顯示視窗
+    settingGui.Show(Format("x{:d} y{:d} w{:d}", offsetX, offsetY, cfg.guiW))
 
     CloseSetting(guiObj) {
         global isSettingOpen
         mainGui.Opt("-Disabled") ; 恢復主視窗點擊
         isSettingOpen := false  ; 恢復 Hotkey 運作
+
+        ApplySettings() ; 關閉時套用設定
+
         guiObj.Destroy()
         settingGui := 0 ; 清空 static 變數
     }
+}
+; === Setting Handlers ===
+; 套用 Setting 狀態到目前程式
+ApplySettings() {
+    global currentAot
+
+    aotOption := (currentAot == "ON") ? "+AlwaysOnTop" : "-AlwaysOnTop"
+    mainGui.Opt(aotOption)
+}
+; Always On Top的開關
+ChangeAOT(chkObj, *) {
+    global currentAot
+
+    if (chkObj.Value == 1) {
+        currentAot := "ON"
+        IniWrite(currentAot, iniFilePath, "Window", "AlwaysOnTop")
+        return
+    }
+
+    if (chkObj.Value == 0) {
+        currentAot := "OFF"
+        IniWrite(currentAot, iniFilePath, "Window", "AlwaysOnTop")
+        return
+    }
+}
+ChangeTray(*) {
+    MsgBox("Tray")
+}
+BackupSettings(*) {
+    MsgBox("Backup")
+}
+RestoreSettings(*) {
+    MsgBox("Restore")
 }
 
 ; --- 編輯檔案 ---
