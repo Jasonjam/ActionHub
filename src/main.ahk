@@ -94,6 +94,7 @@ global isSettingOpen := false
 ; 讀取 ini 檔案
 currentPos := IniRead(iniFilePath, "Window", "Pos", "xCenter yCenter")
 currentAot := IniRead(iniFilePath, "Window", "AlwaysOnTop", "ON") ; 預設為 ON
+currentTray := IniRead(iniFilePath, "CloseToTray", "CloseToTray", "ON") ; 預設為 ON
 
 ; --- 決定要讀取的 Section ---
 ; 先看有沒有使用者自訂的 [Hotkey]，沒有就讀預設的 [default-hotkey]
@@ -222,7 +223,7 @@ mainGui.Show(currentPos " w340")
 
 ; --- BTN事件 ---
 ; 視窗關閉
-mainGui.OnEvent("Close", (*) => (mainGui.Hide()))
+mainGui.OnEvent("Close", MainGuiCloseHandler)
 ; reload按鍵
 btnReload.OnEvent("Click", (*) => (ReloadHandler()))
 ; setting按鍵
@@ -613,9 +614,9 @@ ShowSettingGui(*) {
         value: currentAot == "ON",
         handler: ChangeAOT
     }, {
-        label: "Close in Tray",
+        label: "Close To Tray",
         type: "checkbox",
-        value: true,
+        value: currentTray == "ON",
         handler: ChangeTray
     }, {
         label: "Backup",
@@ -723,8 +724,20 @@ ChangeAOT(chkObj, *) {
         return
     }
 }
-ChangeTray(*) {
-    MsgBox("Tray")
+ChangeTray(chkObj, *) {
+    global currentTray
+
+    if (chkObj.Value == 1) {
+        currentTray := "ON"
+        IniWrite(currentTray, iniFilePath, "Tray", "CloseToTray")
+        return
+    }
+
+    if (chkObj.Value == 0) {
+        currentTray := "OFF"
+        IniWrite(currentTray, iniFilePath, "Tray", "CloseToTray")
+        return
+    }
 }
 BackupSettings(*) {
     MsgBox("Backup")
@@ -948,6 +961,20 @@ HotReload(*) {
         }
     } catch Error as e {
         MsgBox("自動編譯發生錯誤：`n" e.Message)
+    }
+}
+
+MainGuiCloseHandler(*) {
+    global currentTray
+
+    if (currentTray == "ON") {
+        mainGui.Hide()
+        return
+    }
+
+    if (currentTray == "OFF") {
+        ExitApp()
+        return
     }
 }
 
