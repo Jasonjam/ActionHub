@@ -2,6 +2,7 @@
 #Requires AutoHotkey v2
 #Include action_lib.ahk
 #Include action.ahk
+#Include setting_handler.ahk
 #MaxThreadsPerHotkey 2
 
 ; ---- 管理員模式檢查 (v2 轉檔相容版) ----
@@ -94,7 +95,7 @@ global isSettingOpen := false
 ; 讀取 ini 檔案
 currentPos := IniRead(iniFilePath, "Window", "Pos", "xCenter yCenter")
 currentAot := IniRead(iniFilePath, "Window", "AlwaysOnTop", "ON") ; 預設為 ON
-currentTray := IniRead(iniFilePath, "CloseToTray", "CloseToTray", "ON") ; 預設為 ON
+currentTray := IniRead(iniFilePath, "Tray", "CloseToTray", "ON") ; 預設為 ON
 
 ; --- 決定要讀取的 Section ---
 ; 先看有沒有使用者自訂的 [Hotkey]，沒有就讀預設的 [default-hotkey]
@@ -363,8 +364,8 @@ ShowActionGui(*) {
     offsetY := mainY + 50  ; 向下位移 50 像素
 
     ; 建立 Action GUI
-    actionGui := Gui("-MinimizeBox -MaximizeBox", "Hotkey Actions") ;新視窗拿掉縮小,放大
-    actionGui.Opt("+AlwaysOnTop") ; 用 Opt 增加"保持上層"的屬性
+    actionGui := Gui("-MinimizeBox -MaximizeBox", "Hotkey Actions") ;新視窗移除縮小,放大
+    actionGui.Opt("+Owner" mainGui.Hwnd) ; 設定 Main GUI 為 Owner, 讓 Action GUI 跟隨 Main GUI 的視窗層級
     actionGui.SetFont("s10", "Microsoft JhengHei")
 
     ; --- 綁定關閉事件 (用來還原 MAIN PAGE 狀態) ---
@@ -574,8 +575,7 @@ ShowSettingGui(*) {
     mainGui.Opt("+Disabled")
 
     ; 建立 Setting GUI
-    settingGui := Gui("-MinimizeBox -MaximizeBox", "Settings")
-    settingGui.Opt("+AlwaysOnTop")
+    settingGui := Gui("+Owner" mainGui.Hwnd " -MinimizeBox -MaximizeBox", "Settings") ; 濃縮 actiongui 的寫法
     settingGui.SetFont("s10", "Microsoft JhengHei")
 
     ; 關閉事件
@@ -622,12 +622,12 @@ ShowSettingGui(*) {
         label: "Backup",
         type: "button",
         text: "Backup",
-        handler: BackupSettings
+        handler: BackupSettingsHandler
     }, {
         label: "Restore",
         type: "button",
         text: "Restore",
-        handler: RestoreSettings
+        handler: RestoreSettingsHandler
     }]
     ; --- Setting 模板 (不用改，專注Data就好) ---
     currentY := cfg.startY
@@ -699,51 +699,6 @@ ShowSettingGui(*) {
         guiObj.Destroy()
         settingGui := 0 ; 清空 static 變數
     }
-}
-; === Setting Handlers ===
-; 套用 Setting 狀態到目前程式
-ApplySettings() {
-    global currentAot
-
-    aotOption := (currentAot == "ON") ? "+AlwaysOnTop" : "-AlwaysOnTop"
-    mainGui.Opt(aotOption)
-}
-; Always On Top的開關
-ChangeAOT(chkObj, *) {
-    global currentAot
-
-    if (chkObj.Value == 1) {
-        currentAot := "ON"
-        IniWrite(currentAot, iniFilePath, "Window", "AlwaysOnTop")
-        return
-    }
-
-    if (chkObj.Value == 0) {
-        currentAot := "OFF"
-        IniWrite(currentAot, iniFilePath, "Window", "AlwaysOnTop")
-        return
-    }
-}
-ChangeTray(chkObj, *) {
-    global currentTray
-
-    if (chkObj.Value == 1) {
-        currentTray := "ON"
-        IniWrite(currentTray, iniFilePath, "Tray", "CloseToTray")
-        return
-    }
-
-    if (chkObj.Value == 0) {
-        currentTray := "OFF"
-        IniWrite(currentTray, iniFilePath, "Tray", "CloseToTray")
-        return
-    }
-}
-BackupSettings(*) {
-    MsgBox("Backup")
-}
-RestoreSettings(*) {
-    MsgBox("Restore")
 }
 
 ; --- 編輯檔案 ---
@@ -926,6 +881,20 @@ ToggleSuspend(*) {
     }
 }
 
+MainGuiCloseHandler(*) {
+    global currentTray
+
+    if (currentTray == "ON") {
+        mainGui.Hide()
+        return
+    }
+
+    if (currentTray == "OFF") {
+        ExitApp()
+        return
+    }
+}
+
 HotReload(*) {
     v1Engine := APP_ROOT "\tools\AutoHotkey\AutohotkeyU64.exe"
     compiler := APP_ROOT "\tools\AutoHotkey\Compiler\Ahk2Exe.ahk"
@@ -961,20 +930,6 @@ HotReload(*) {
         }
     } catch Error as e {
         MsgBox("自動編譯發生錯誤：`n" e.Message)
-    }
-}
-
-MainGuiCloseHandler(*) {
-    global currentTray
-
-    if (currentTray == "ON") {
-        mainGui.Hide()
-        return
-    }
-
-    if (currentTray == "OFF") {
-        ExitApp()
-        return
     }
 }
 
