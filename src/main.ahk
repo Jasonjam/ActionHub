@@ -2,6 +2,7 @@
 #Requires AutoHotkey v2
 #Include action_lib.ahk
 #Include action.ahk
+#Include customPopupBox.ahk
 #Include setting_handler.ahk
 #MaxThreadsPerHotkey 2
 
@@ -665,7 +666,10 @@ ShowSettingGui(*) {
                 item.text
             )
 
-            ctrl.OnEvent("Click", item.handler)
+            ctrl.OnEvent(
+                "Click",
+                item.handler.Bind(settingGui)
+            )
         }
 
         ; 移動到控制項下方
