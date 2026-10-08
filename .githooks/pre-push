@@ -19,20 +19,29 @@ if [ -f "$SETTING_RUNTIME" ]; then
     mv -f "$SETTING_RUNTIME" "$SETTING_TEMPLATE"
     echo "✓ setting.ini → setting.ini.template"
 
-    # [default-hotkey] 保留範例內容，其餘 Section 清空 Value
+fi
+
+# 清理 Template: 移除使用者 Hotkey Section，清空其餘 Runtime Value
+# 即使前次 Push 已轉成 Template，仍需執行清理
+if [ -f "$SETTING_TEMPLATE" ]; then
     awk '
     BEGIN {
         keep_value = 0
+        skip_hotkey = 0
     }
 
-    /^\[default-hotkey\]$/ {
-        keep_value = 1
-        print
+    /^\[Hotkey\]$/ {
+        skip_hotkey = 1
         next
     }
     /^\[/ {
-        keep_value = 0
+        skip_hotkey = 0
+        keep_value = ($0 == "[default-hotkey]")
         print
+        next
+    }
+
+    skip_hotkey {
         next
     }
 
@@ -40,13 +49,12 @@ if [ -f "$SETTING_RUNTIME" ]; then
         if (!keep_value && $0 ~ /^[^;#][^=]*=/) {
             sub(/=.*/, "=")
         }
-
         print
     }
     ' "$SETTING_TEMPLATE" > "$SETTING_TEMPLATE.tmp"
 
     mv -f "$SETTING_TEMPLATE.tmp" "$SETTING_TEMPLATE"
-    echo "✓ 已清除 setting.ini.template 的 Runtime 設定值"
+    echo "✓ 已清理 setting.ini.template 的 Runtime 值與 [Hotkey]"
 fi
 
 # Template 必須存在，Runtime 必須不存在
