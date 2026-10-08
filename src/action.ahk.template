@@ -16,3 +16,14 @@ test__MsgBox(*) {
 ; --- 預設動作範例結束 ---
 
 ; === 編輯區，結束 ===
+
+test__Backup(*) {
+    MsgBox("Backup JSON 測試")
+    testPath := "D:\Test\ActionHub"
+    testText := "Hello`nWorld"
+}
+
+test__One(*) {
+    MsgBox("111111111111111")
+
+}

@@ -2,6 +2,8 @@
 #Requires AutoHotkey v2
 #Include action_lib.ahk
 #Include action.ahk
+#Include customPopupBox.ahk
+#Include setting_handler.ahk
 #MaxThreadsPerHotkey 2
 
 ; ---- 管理員模式檢查 (v2 轉檔相容版) ----
@@ -88,11 +90,13 @@ iniFilePath := SRC_DIR "\setting.ini"
 actionFilePath := SRC_DIR "\action.ahk"
 hotkeyMap := Map() ; 存儲ini的熱鍵與函式名
 global ActionFnStatus := Map() ; 紀錄 action 是否運作
+global isActionOpen := false
 global isSettingOpen := false
 
-; 讀取視窗位置與 Pin 狀態
-savedPos := IniRead(iniFilePath, "Window", "Pos", "xCenter yCenter")
-savedAOT := IniRead(iniFilePath, "Window", "AlwaysOnTop", "ON") ; 預設為 ON
+; 讀取 ini 檔案
+currentPos := IniRead(iniFilePath, "Window", "Pos", "xCenter yCenter")
+currentAot := IniRead(iniFilePath, "Window", "AlwaysOnTop", "ON") ; 預設為 ON
+currentTray := IniRead(iniFilePath, "Tray", "CloseToTray", "ON") ; 預設為 ON
 
 ; --- 決定要讀取的 Section ---
 ; 先看有沒有使用者自訂的 [Hotkey]，沒有就讀預設的 [default-hotkey]
@@ -167,17 +171,17 @@ for hk, info in hotkeyMap {
 ; MsgBox(debugText)
 
 ; --- 創建 GUI ---
-; 根據讀取的 savedAOT 決定初始狀態
-aotOption := (savedAOT == "ON") ? "+AlwaysOnTop" : "-AlwaysOnTop"
+; 根據讀取的 currentAot 決定初始狀態
+aotOption := (currentAot == "ON") ? "+AlwaysOnTop" : "-AlwaysOnTop"
 mainGui := Gui(aotOption, "ActionHub")
 mainGui.SetFont("s10", "Microsoft JhengHei")
 
 ; 按鈕區
-btnReload := mainGui.Add("Button", "x20 y10 w80", "Reload")
-btnPin := mainGui.Add("Button", "x130 y10 w80", "Pin: " savedAOT)
+btnAction := mainGui.Add("Button", "x20 y10 w80", "Action")
+btnReload := mainGui.Add("Button", "x130 y10 w80", "Reload")
 btnSetting := mainGui.Add("Button", "x240 y10 w80", "Setting")
 
-; 標題列
+; Action 標題列
 mainGui.SetFont("s11 bold")
 mainGui.Add("Text", "x20 y60 w100", "Hotkey")
 mainGui.Add("Text", "x140 y60 w100", "Action")
@@ -217,17 +221,17 @@ for index, hk in guiHotkeyList {
 ; --- 顯示GUI ---
 ; 啟動訊息監聽 (監聽滑鼠放開移動結束)
 OnMessage(0x0232, WM_EXITSIZEMOVE)
-mainGui.Show(savedPos " w340")
+mainGui.Show(currentPos " w340")
 
 ; --- BTN事件 ---
 ; 視窗關閉
-mainGui.OnEvent("Close", (*) => (mainGui.Hide()))
+mainGui.OnEvent("Close", MainGuiCloseHandler)
 ; reload按鍵
-btnReload.OnEvent("Click", (*) => (SaveStatus(), ReloadHandler()))
-; pin按鍵
-btnPin.OnEvent("Click", ChangeAOT)
+btnReload.OnEvent("Click", (*) => (ReloadHandler()))
 ; setting按鍵
 btnSetting.OnEvent("Click", ShowSettingGui)
+; action按鍵
+btnAction.OnEvent("Click", ShowActionGui)
 
 ; --- 快速 FUNC 區 ----
 RCtrl & F5:: HotReload() ; 強制重啟
@@ -235,33 +239,14 @@ RCtrl & F5:: HotReload() ; 強制重啟
 RCtrl & F8:: ToggleSuspend()
 #SuspendExempt False
 
-; 儲存視窗的狀態，包含:位置, AOT狀態
-SaveStatus() {
-    ; 取得座標
-    mainGui.GetPos(&x, &y)
-    if (x > -3000) { ; 避開最小化狀態
-        IniWrite("x" x " y" y, iniFilePath, "Window", "Pos")
-    }
-    ; 取得並儲存 Pin 狀態 (從按鈕文字判斷最直覺), AOT=Always On Top
-    AOTStatus := InStr(btnPin.Text, "ON") ? "ON" : "OFF"
-    IniWrite(AOTStatus, iniFilePath, "Window", "AlwaysOnTop")
-}
-
-; Always On Top的開關
-ChangeAOT(btnObj, *) {
-    if InStr(btnObj.Text, "ON") {
-        mainGui.Opt("-AlwaysOnTop")
-        btnObj.Text := "Pin: OFF"
-    } else {
-        mainGui.Opt("+AlwaysOnTop")
-        btnObj.Text := "Pin: ON"
-    }
-}
-
 ; 監聽 移動視窗 這個動作
 WM_EXITSIZEMOVE(wParam, lParam, msg, hwnd) {
     if (hwnd = mainGui.Hwnd) {
-        SaveStatus()
+        mainGui.GetPos(&x, &y) ; 取得座標
+
+        if (x > -3000) { ; 避開最小化狀態
+            IniWrite("x" x " y" y, iniFilePath, "Window", "Pos") ; 儲存視窗的狀態
+        }
     }
 }
 
@@ -272,20 +257,20 @@ UpdateGUIStatus(actionName, isRunning) {
         if (isRunning) {
             ctrl.SetFont("cGreen s11 Bold")  ; 啟動時加粗更明顯
             ctrl.Value := "O"
-        } 
-        if(!isRunning) {
+        }
+        if (!isRunning) {
             ctrl.SetFont("cRed s11 norm")  ; 關閉時恢復紅色和正常字重
             ctrl.Value := "X"
         }
     }
 }
 
-; O/X 開關
+; O/X 開關 & Action執行
 ToggleAction(actionName, intervalMs := 100, *) {
-    global ActionFnStatus, isSettingOpen
+    global ActionFnStatus, isActionOpen, isSettingOpen
 
-    ; --- 關鍵攔截：如果設定頁面開著 || 暫停狀態中，直接結束不執行 ---
-    if (isSettingOpen || A_IsSuspended)
+    ; --- 關鍵攔截：如果 Action GUI 開著 || Setting GUI 開著 || 暫停狀態中，直接結束不執行 ---
+    if (isActionOpen || isSettingOpen || A_IsSuspended)
         return
 
     ; 1. 初始化狀態 (如果沒跑過)
@@ -301,7 +286,7 @@ ToggleAction(actionName, intervalMs := 100, *) {
     ; --- 熱鍵開啟 ---
     if (ActionFnStatus[actionName]) {
         ; 這邊用 SetTimer 來操作 ActionFunc()，SetTimer(Func, ms) 會每隔 ms 毫秒呼叫一次 Func
-        UpdateGUIStatus(actionName, true)  ; GUI 變綠 O 
+        UpdateGUIStatus(actionName, true)  ; GUI 變綠 O
         __ShowTip(actionName " : ON (" intervalMs "ms)") ; 啟動時, tooltip 提示
         Sleep(-1)  ; 讓 GUI / Tooltip 有機會先重繪
 
@@ -313,18 +298,19 @@ ToggleAction(actionName, intervalMs := 100, *) {
         ToolTip()                    ; 清空可能殘留的 SleepTimer 倒數文字
         UpdateGUIStatus(actionName, false)  ; GUI 變紅 X
         __ShowTip(actionName " : OFF", 1000)  ; 關閉時, tooltip 提示
-        
+
     }
 }
 
-ShowSettingGui(*) {
-    global isSettingOpen, guiHotkeyList
-    static settingGui := 0 ; 紀錄已開啟的視窗，避免重複打開多個設定頁面
-    static settingRows := [] ; 宣告，用來存儲每一行的控制項物件(main用)
-    static previewHKList := [] ; 草稿副本，setting用
+; --- Action GUI ---
+ShowActionGui(*) {
+    global isActionOpen, guiHotkeyList
+    static actionGui := 0 ; 紀錄已開啟的視窗，避免重複打開多個 Action GUI
+    static actionRows := [] ; 宣告，用來存儲每一行的控制項物件(main用)
+    static previewHKList := [] ; 草稿副本，action用
 
     ; --- 只有從主畫面點進來時，才同步原始資料 ---
-    if (settingGui == 0) {
+    if (actionGui == 0) {
         previewHKList := []
         for item in guiHotkeyList {
             ; 確保是深拷貝，避免改到原始物件指標
@@ -361,16 +347,16 @@ ShowSettingGui(*) {
         return opt
     }
 
-    ; 如果Setting已打開，就直接帶到最前面
+    ; 如果Action已打開，就直接帶到最前面
     try {
-        if (settingGui != 0 && WinExist("ahk_id " settingGui.Hwnd)) {
-            settingGui.Show()
+        if (actionGui != 0 && WinExist("ahk_id " actionGui.Hwnd)) {
+            actionGui.Show()
             return
         }
     }
 
     ; --- 禁用主視窗 (使其不可點擊) ---
-    isSettingOpen := true
+    isActionOpen := true
     mainGui.Opt("+Disabled")
 
     ; --- 計算座標 (偏移位移) ---
@@ -378,19 +364,19 @@ ShowSettingGui(*) {
     offsetX := mainX + 50  ; 向右位移 50 像素
     offsetY := mainY + 50  ; 向下位移 50 像素
 
-    ; 建立 Setting page 視窗
-    settingGui := Gui("-MinimizeBox -MaximizeBox", "Hotkey Settings") ;新視窗拿掉縮小,放大
-    settingGui.Opt("+AlwaysOnTop") ; 用 Opt 增加"保持上層"的屬性
-    settingGui.SetFont("s10", "Microsoft JhengHei")
+    ; 建立 Action GUI
+    actionGui := Gui("-MinimizeBox -MaximizeBox", "Hotkey Actions") ;新視窗移除縮小,放大
+    actionGui.Opt("+Owner" mainGui.Hwnd) ; 設定 Main GUI 為 Owner, 讓 Action GUI 跟隨 Main GUI 的視窗層級
+    actionGui.SetFont("s10", "Microsoft JhengHei")
 
     ; --- 綁定關閉事件 (用來還原 MAIN PAGE 狀態) ---
-    settingGui.OnEvent("Close", (guiObj) => CloseSetting(guiObj))
+    actionGui.OnEvent("Close", (guiObj) => CloseAction(guiObj))
 
     ; 標題列
-    settingGui.Add("Text", "x" cfg.noX " y15 w" cfg.noW, "No.")
-    settingGui.Add("Text", "x" cfg.delX " y15 w" cfg.delW, "Del")
-    settingGui.Add("Text", "x" cfg.hkX " y15 w" cfg.hkW, "Hotkey")
-    settingGui.Add("Text", "x" cfg.actTitleX " y15 w" cfg.actW, "Action Function")
+    actionGui.Add("Text", "x" cfg.noX " y15 w" cfg.noW, "No.")
+    actionGui.Add("Text", "x" cfg.delX " y15 w" cfg.delW, "Del")
+    actionGui.Add("Text", "x" cfg.hkX " y15 w" cfg.hkW, "Hotkey")
+    actionGui.Add("Text", "x" cfg.actTitleX " y15 w" cfg.actW, "Action Function")
 
     ; --- 動態生成目前 INI 裡的設定行 ---
     ; 1. 呼叫自動掃描功能
@@ -404,7 +390,7 @@ ShowSettingGui(*) {
     actionListWithSelect.InsertAt(1, "-- Select --")
 
     currentY := cfg.startY ; 初始Y
-    settingRows := [] ; 每次打開Setting就清空舊的追蹤紀錄
+    actionRows := [] ; 每次打開Action就清空舊的追蹤紀錄
 
     for index, rowData in previewHKList {
         ; 判斷傳進來的是單純字串(啟動時)還是物件(AddNew後)
@@ -424,18 +410,19 @@ ShowSettingGui(*) {
 
         ; 排序
         ; 使用 Format("{:02d}.", index) 可以讓 1 變成 01，排版更整齊，第一個Center垂直置中
-        settingGui.Add("Text", MakePos(cfg.noX, currentY, cfg.noW, cfg.rowH, "Center +0x200"), Format("{:02d}.", index))
+        actionGui.Add("Text", MakePos(cfg.noX, currentY, cfg.noW, cfg.rowH, "Center +0x200"), Format("{:02d}.",
+            index))
 
         ; 刪除按鈕 (-)
-        row.btnObj := settingGui.Add("Button", MakePos(cfg.delX, currentY, cfg.delW, cfg.rowH), "-")
+        row.btnObj := actionGui.Add("Button", MakePos(cfg.delX, currentY, cfg.delW, cfg.rowH), "-")
         currIdx := index ; 建立一個目前的 index 副本，確保 Bind 抓到的是當下的數字
         row.btnObj.OnEvent("Click", DeleteRow.Bind(currIdx)) ; 需綁定 index 進去
 
         ; 熱鍵輸入框 (Edit)
-        row.editObj := settingGui.Add("Edit", MakePos(cfg.hkX, currentY, cfg.hkW, cfg.rowH), currentHK)
+        row.editObj := actionGui.Add("Edit", MakePos(cfg.hkX, currentY, cfg.hkW, cfg.rowH), currentHK)
 
         ; 動作選擇
-        row.ddlObj := settingGui.Add("DropDownList", Format("x{:d} y{:d} w{:d}", cfg.actX, currentY, cfg.actW),
+        row.ddlObj := actionGui.Add("DropDownList", Format("x{:d} y{:d} w{:d}", cfg.actX, currentY, cfg.actW),
         actionListWithSelect)
 
         ; 讓 DropDownList 自動選中目前 INI 裡的那個動作
@@ -452,7 +439,7 @@ ShowSettingGui(*) {
         }
 
         ; --- 把這一行的物件包存進大陣列 ---
-        settingRows.Push(row)
+        actionRows.Push(row)
 
         ; 下一行的間距
         currentY += cfg.spaceH
@@ -460,40 +447,40 @@ ShowSettingGui(*) {
 
     ; --- 底部功能區 ---
     ; 分隔線
-    settingGui.Add("Text", Format("x{:d} y{:d} w{:d} h1 BackgroundGray", cfg.hrX, currentY, cfg.hrW))
+    actionGui.Add("Text", Format("x{:d} y{:d} w{:d} h1 BackgroundGray", cfg.hrX, currentY, cfg.hrW))
     currentY += cfg.hrMB
 
     ; Add New
-    btnAddNewRow := settingGui.Add("Button", Format("x{:d} y{:d} w{:d}", cfg.addBtnX, currentY, cfg.addBtnW),
+    btnAddNewRow := actionGui.Add("Button", Format("x{:d} y{:d} w{:d}", cfg.addBtnX, currentY, cfg.addBtnW),
     "+ Add New")
     btnAddNewRow.OnEvent("Click", AddNewRow)
 
     ; Save
-    btnSave := settingGui.Add("Button", Format("x{:d} y{:d} w{:d}", cfg.saveBtnX, currentY, cfg.saveBtnW), "Save")
+    btnSave := actionGui.Add("Button", Format("x{:d} y{:d} w{:d}", cfg.saveBtnX, currentY, cfg.saveBtnW), "Save")
     btnSave.SetFont("bold")
-    btnSave.OnEvent("Click", (*) => ProcessSave(settingRows))
+    btnSave.OnEvent("Click", (*) => ProcessSave(actionRows))
 
     ; Cancel
-    btnCancel := settingGui.Add("Button", Format("x{:d} y{:d} w{:d}", cfg.cancelBtnX, currentY, cfg.cancelBtnW),
+    btnCancel := actionGui.Add("Button", Format("x{:d} y{:d} w{:d}", cfg.cancelBtnX, currentY, cfg.cancelBtnW),
     "Cancel")
-    btnCancel.OnEvent("Click", (*) => CloseSetting(settingGui))
+    btnCancel.OnEvent("Click", (*) => CloseAction(actionGui))
 
     ; 顯示視窗，計算在MAIN PAGE的右下方
-    settingGui.Show(Format("x{:d} y{:d} w{:d}", offsetX, offsetY, cfg.guiW))
+    actionGui.Show(Format("x{:d} y{:d} w{:d}", offsetX, offsetY, cfg.guiW))
 
-    ; 內部函式：負責關閉 Setting 並解鎖 Main
-    CloseSetting(guiObj) {
-        global isSettingOpen
+    ; 內部函式：負責關閉 Action 並解鎖 Main
+    CloseAction(guiObj) {
+        global isActionOpen
         mainGui.Opt("-Disabled") ; 恢復主視窗點擊
-        isSettingOpen := false  ; 恢復 Hotkey 運作
+        isActionOpen := false  ; 恢復 Hotkey 運作
         guiObj.Destroy()
-        settingGui := 0     ; 清空 static 變數
+        actionGui := 0     ; 清空 static 變數
     }
 
     AddNewRow(*) {
         ; 1. 收集目前畫面上「所有行」的資料 (包含熱鍵與選中的動作)
         tempData := []
-        for r in settingRows {
+        for r in actionRows {
             ; 確保這個 row 物件裡真的有控制項，才抓資料
             if (r.HasOwnProp("editObj") && r.HasOwnProp("ddlObj")) {
                 tempData.Push({
@@ -509,10 +496,10 @@ ShowSettingGui(*) {
         ; 3. 更新全域清單 (雖然它叫 guiHotkeyList，但我們現在塞物件進去)
         previewHKList := tempData
 
-        settingGui.Destroy()
-        settingGui := 1
-        isSettingOpen := false
-        ShowSettingGui()
+        actionGui.Destroy()
+        actionGui := 1
+        isActionOpen := false
+        ShowActionGui()
     }
 
     DeleteRow(idx, *) {
@@ -522,8 +509,8 @@ ShowSettingGui(*) {
         }
 
         tempData := []
-        ; 遍歷 settingRows，但加入安全檢查
-        for r in settingRows {
+        ; 遍歷 actionRows，但加入安全檢查
+        for r in actionRows {
             ; 確保這個 row 物件裡真的有控制項，才抓資料
             if (r.HasOwnProp("editObj") && r.HasOwnProp("ddlObj")) {
                 tempData.Push({
@@ -539,10 +526,10 @@ ShowSettingGui(*) {
         }
         previewHKList := tempData
 
-        settingGui.Destroy()
-        settingGui := 1
-        isSettingOpen := false
-        ShowSettingGui()
+        actionGui.Destroy()
+        actionGui := 1
+        isActionOpen := false
+        ShowActionGui()
     }
 }
 
@@ -569,6 +556,153 @@ ScanActions() {
     }
     return actions
 
+}
+
+; --- Setting GUI ---
+ShowSettingGui(*) {
+    global isSettingOpen
+    static settingGui := 0 ; 紀錄已開啟的視窗，避免重複打開多個 Setting GUI
+
+    ; 如果 Setting 已打開，就直接帶到最前面
+    try {
+        if (settingGui != 0 && WinExist("ahk_id " settingGui.Hwnd)) {
+            settingGui.Show()
+            return
+        }
+    }
+
+    ; --- 禁用主視窗 (使其不可點擊) ---
+    isSettingOpen := true
+    mainGui.Opt("+Disabled")
+
+    ; 建立 Setting GUI
+    settingGui := Gui("+Owner" mainGui.Hwnd " -MinimizeBox -MaximizeBox", "Settings") ; 濃縮 actiongui 的寫法
+    settingGui.SetFont("s10", "Microsoft JhengHei")
+
+    ; 關閉事件
+    settingGui.OnEvent("Close", (guiObj) => CloseSetting(guiObj))
+
+    ; ===== Setting 內容 =====
+    ; --- 介面佈局配置 ---
+    cfg := {
+        ; --- GUI ---
+        guiW: 280,             ; Setting GUI 整體寬度
+        ; --- 每列 Setting ---
+        startY: 15,            ; 第一列起始 Y
+        rowH: 20,              ; 每列控制項高度
+        spaceH: 5,            ; 控制項底部到分隔線的距離
+        ; --- 左側 Label ---
+        labelX: 20,            ; Label 左側位置
+        labelW: 180,           ; Label 寬度
+        ; --- Checkbox ---
+        checkX: 230,           ; Checkbox 左側位置
+        checkW: 20,            ; Checkbox 寬度
+        ; --- Button ---
+        btnX: 175,             ; Button 左側位置
+        btnW: 70,              ; Button 寬度
+        btnH: 22,              ; Button 高度
+        btnOffsetY: -2,        ; Button 垂直微調，負值往上
+        ; --- 分隔線 ---
+        hrX: 20,               ; 分隔線左側位置
+        hrW: 240,              ; 分隔線寬度
+        hrMB: 20               ; 分隔線到下一列的距離
+    }
+
+    ; --- Setting Data ---
+    settingItems := [{
+        label: "Always On Top",
+        type: "checkbox",
+        value: currentAot == "ON",
+        handler: ChangeAOT
+    }, {
+        label: "Close To Tray",
+        type: "checkbox",
+        value: currentTray == "ON",
+        handler: ChangeTray
+    }, {
+        label: "Backup",
+        type: "button",
+        text: "Backup",
+        handler: BackupSettingsHandler
+    }, {
+        label: "Restore",
+        type: "button",
+        text: "Restore",
+        handler: RestoreSettingsHandler
+    }]
+    ; --- Setting 模板 (不用改，專注Data就好) ---
+    currentY := cfg.startY
+
+    for item in settingItems {
+        ; 左側名稱
+        settingGui.Add(
+            "Text",
+            Format("x{:d} y{:d} w{:d} h{:d} +0x200",
+                cfg.labelX, currentY, cfg.labelW, cfg.rowH),
+            item.label
+        )
+
+        ; Checkbox
+        if (item.type == "checkbox") {
+            ctrl := settingGui.Add(
+                "CheckBox",
+                Format("x{:d} y{:d} w{:d} h{:d}",
+                    cfg.checkX, currentY, cfg.checkW, cfg.rowH)
+            )
+
+            ctrl.Value := item.value
+            ctrl.OnEvent("Click", item.handler)
+        }
+
+        ; Button
+        if (item.type == "button") {
+            ctrl := settingGui.Add(
+                "Button",
+                Format("x{:d} y{:d} w{:d} h{:d}",
+                    cfg.btnX,
+                    currentY + cfg.btnOffsetY,
+                    cfg.btnW,
+                    cfg.btnH),
+                item.text
+            )
+
+            ctrl.OnEvent(
+                "Click",
+                item.handler.Bind(settingGui)
+            )
+        }
+
+        ; 移動到控制項下方
+        currentY += cfg.rowH + cfg.spaceH
+
+        ; 分隔線
+        settingGui.Add(
+            "Text",
+            Format("x{:d} y{:d} w{:d} h1 BackgroundGray",
+                cfg.hrX, currentY, cfg.hrW)
+        )
+
+        ; 移動到下一列
+        currentY += cfg.hrMB
+    }
+
+    ; 取得 Main 座標
+    mainGui.GetPos(&mainX, &mainY, &mainW, &mainH)
+    offsetX := mainX + 50
+    offsetY := mainY + 50
+    ; 顯示視窗
+    settingGui.Show(Format("x{:d} y{:d} w{:d}", offsetX, offsetY, cfg.guiW))
+
+    CloseSetting(guiObj) {
+        global isSettingOpen
+        mainGui.Opt("-Disabled") ; 恢復主視窗點擊
+        isSettingOpen := false  ; 恢復 Hotkey 運作
+
+        ApplySettings() ; 關閉時套用設定
+
+        guiObj.Destroy()
+        settingGui := 0 ; 清空 static 變數
+    }
 }
 
 ; --- 編輯檔案 ---
@@ -751,31 +885,46 @@ ToggleSuspend(*) {
     }
 }
 
+MainGuiCloseHandler(*) {
+    global currentTray
+
+    if (currentTray == "ON") {
+        mainGui.Hide()
+        return
+    }
+
+    if (currentTray == "OFF") {
+        ExitApp()
+        return
+    }
+}
+
 HotReload(*) {
-    v1Engine   := APP_ROOT "\tools\AutoHotkey\AutohotkeyU64.exe"
-    compiler   := APP_ROOT "\tools\AutoHotkey\Compiler\Ahk2Exe.ahk"
-    v2Base     := APP_ROOT "\tools\AutoHotkey\AutoHotkey64.exe"
-    iconPath   := APP_ROOT "\assets\app_icon.ico"
+    v1Engine := APP_ROOT "\tools\AutoHotkey\AutohotkeyU64.exe"
+    compiler := APP_ROOT "\tools\AutoHotkey\Compiler\Ahk2Exe.ahk"
+    v2Base := APP_ROOT "\tools\AutoHotkey\AutoHotkey64.exe"
+    iconPath := APP_ROOT "\assets\app_icon.ico"
     sourcePath := APP_ROOT "\src\main.ahk"
-    
+
     ; 改到系統 Temp 資料夾編譯，徹底避開資料夾鎖定問題
-    tempExe    := A_Temp "\ActionHub_compile_tmp.exe"
-    finalExe   := APP_ROOT "\ActionHub.exe"
+    tempExe := A_Temp "\ActionHub_compile_tmp.exe"
+    finalExe := APP_ROOT "\ActionHub.exe"
 
     ; 如果上次編譯失敗留下了檔案，先刪除
     if FileExist(tempExe)
         FileDelete(tempExe)
 
     try {
-        ; cmd := '"' v1Engine '" "' compiler '"' 
-        ;     . ' /in "' sourcePath '"' 
-        ;     . ' /out "' tempExe '"' 
-        ;     . ' /base "' v2Base '"' 
+        ; cmd := '"' v1Engine '" "' compiler '"'
+        ;     . ' /in "' sourcePath '"'
+        ;     . ' /out "' tempExe '"'
+        ;     . ' /base "' v2Base '"'
         ;     . ' /icon "' iconPath '"'
-        cmd := Format('"{1}" "{2}" /in "{3}" /out "{4}" /base "{5}" /icon "{6}"', v1Engine, compiler, sourcePath, tempExe, v2Base, iconPath)
+        cmd := Format('"{1}" "{2}" /in "{3}" /out "{4}" /base "{5}" /icon "{6}"', v1Engine, compiler, sourcePath,
+            tempExe, v2Base, iconPath)
 
         RunWait(cmd, , "Hide")
-        
+
         if FileExist(tempExe) {
             ; 呼叫一個外部的 cmd 指令來接手搬運工作，然後本體立刻自殺
             ; 這個指令會：等主程式關閉 -> 把新版搬回根目錄 -> 啟動新版 -> 刪除自己
@@ -787,8 +936,6 @@ HotReload(*) {
         MsgBox("自動編譯發生錯誤：`n" e.Message)
     }
 }
-
-
 
 ReloadHandler(*) {
     ; 取得觸發 Reload 當下的時間
