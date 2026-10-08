@@ -9,3 +9,6 @@ LastActionTime=
 Pos=
 AlwaysOnTop=
 ;----------
+[Tray]
+CloseToTray=
+;----------
