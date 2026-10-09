@@ -1,0 +1,6 @@
+# Windows Batch：保留原始 CRLF，確保 GitHub ZIP 可正常執行
+*.bat -text
+*.cmd -text
+
+# Git Hooks：使用 LF
+.githooks/* text eol=lf
