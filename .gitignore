@@ -2,8 +2,8 @@
 ActionHub.exe
 
 # 個人化檔案
-src/action.ahk
-src/setting.ini
+src/user/action.ahk
+src/user/setting.ini
 
 # 備份檔案
 backup/

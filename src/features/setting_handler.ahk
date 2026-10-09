@@ -12,15 +12,14 @@ ChangeAOT(chkObj, *) {
 
     if (chkObj.Value == 1) {
         currentAot := "ON"
-        IniWrite(currentAot, iniFilePath, "Window", "AlwaysOnTop")
-        return
     }
 
     if (chkObj.Value == 0) {
         currentAot := "OFF"
-        IniWrite(currentAot, iniFilePath, "Window", "AlwaysOnTop")
-        return
     }
+
+    IniWrite(currentAot, iniFilePath, "Window", "AlwaysOnTop")
+    __ShowTip("關閉 Setting 視窗後套用設定", 1500)
 }
 ; Close To Tray
 ChangeTray(chkObj, *) {
@@ -28,15 +27,12 @@ ChangeTray(chkObj, *) {
 
     if (chkObj.Value == 1) {
         currentTray := "ON"
-        IniWrite(currentTray, iniFilePath, "Tray", "CloseToTray")
-        return
     }
 
     if (chkObj.Value == 0) {
         currentTray := "OFF"
-        IniWrite(currentTray, iniFilePath, "Tray", "CloseToTray")
-        return
     }
+    IniWrite(currentTray, iniFilePath, "Tray", "CloseToTray")
 }
 
 ; === Backup ===
@@ -107,15 +103,15 @@ BackupSettingsHandler(settingGui, *) {
 ; - 完整覆蓋目前檔案
 ;
 ; setting.ini:
-; - 以目前版本的 INI 結構為基準
-; - Backup 與目前版本都有的 Key 才還原
-; - 新版本新增的 Key 保留目前值
+; - 以 reset/default_setting.ini 的 Section / Key 為基準
+; - 優先使用 Backup 值，缺少時保留 Runtime 值，兩者都沒有才使用 Reset 預設值
 ; - 舊 Backup 多出的 Key 不還原
 ; - [default-hotkey] / [System] 不還原
 ; - [Hotkey] 屬於使用者資料，獨立完整還原
 RestoreSettingsHandler(settingGui, *) {
     global APP_ROOT, iniFilePath, actionFilePath
 
+    settingGui.Opt("+OwnDialogs")
     ; --- 選擇 Backup 資料夾 ---
     selectedDir := DirSelect(
         APP_ROOT "\backup",
@@ -172,12 +168,12 @@ RestoreSettingsHandler(settingGui, *) {
         ; Restore Setting
         ; ==================================================
 
-        ; 以目前版本的 setting.ini 為基準
-        currentSectionList := IniRead(iniFilePath)
-        ; Backup 沒有這個 Section 就保留目前設定
+        ; 以 reset/default_setting.ini 的 Section / Key 為結構基準
+        defaultIniPath := APP_ROOT "\src\reset\default_setting.ini"
+        defaultSectionList := IniRead(defaultIniPath)
         backupSectionList := IniRead(backupIniPath)
 
-        for section in StrSplit(currentSectionList, "`n", "`r") {
+        for section in StrSplit(defaultSectionList, "`n", "`r") {
             section := Trim(section)
 
             if (section == "")
@@ -196,13 +192,11 @@ RestoreSettingsHandler(settingGui, *) {
             if (skipSection)
                 continue
 
-            if !IniSectionExists(backupSectionList, section)
-                continue
+            ; 即使 Backup 缺少 Section，也要補齊 Runtime 遺失的預設 Key
+            ; 讀取預設結構中的 Key
+            defaultSectionData := IniRead(defaultIniPath, section)
 
-            ; 讀取目前版本 Section
-            currentSectionData := IniRead(iniFilePath, section)
-
-            for line in StrSplit(currentSectionData, "`n", "`r") {
+            for line in StrSplit(defaultSectionData, "`n", "`r") {
                 line := Trim(line)
 
                 if (line == "")
@@ -215,24 +209,21 @@ RestoreSettingsHandler(settingGui, *) {
 
                 key := Trim(SubStr(line, 1, equalPos - 1))
 
-                ; Backup 沒有這個 Key 就保留目前設定
-                backupValue := IniRead(
-                    backupIniPath,
-                    section,
-                    key,
-                    "__ACTIONHUB_KEY_NOT_FOUND__"
-                )
+                ; 優先還原 Backup；沒有則保留 Runtime；兩者都缺少才補預設值
+                missingValue := "__ACTIONHUB_KEY_NOT_FOUND__"
+                backupValue := IniRead(backupIniPath, section, key, missingValue)
 
-                if (backupValue == "__ACTIONHUB_KEY_NOT_FOUND__")
+                if (backupValue != missingValue) {
+                    IniWrite(backupValue, iniFilePath, section, key)
+                    continue
+                }
+
+                currentValue := IniRead(iniFilePath, section, key, missingValue)
+                if (currentValue != missingValue)
                     continue
 
-                ; 目前版本與 Backup 都存在此 Key，還原 Backup 值
-                IniWrite(
-                    backupValue,
-                    iniFilePath,
-                    section,
-                    key
-                )
+                defaultValue := IniRead(defaultIniPath, section, key, "")
+                IniWrite(defaultValue, iniFilePath, section, key)
             }
         }
 

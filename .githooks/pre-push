@@ -3,10 +3,10 @@
 echo ""
 echo "========== PUSH 前處理 =========="
 
-ACTION_RUNTIME="src/action.ahk"
-ACTION_TEMPLATE="src/action.ahk.template"
-SETTING_RUNTIME="src/setting.ini"
-SETTING_TEMPLATE="src/setting.ini.template"
+ACTION_RUNTIME="src/user/action.ahk"
+ACTION_TEMPLATE="src/user/action.ahk.template"
+SETTING_RUNTIME="src/user/setting.ini"
+SETTING_TEMPLATE="src/user/setting.ini.template"
 SETTING_DEFAULT="src/reset/default_setting.ini"
 
 # Runtime 存在時，先轉回 Template 狀態

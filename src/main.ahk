@@ -1,9 +1,9 @@
 #SingleInstance Force
 #Requires AutoHotkey v2
-#Include action_lib.ahk
-#Include action.ahk
-#Include customPopupBox.ahk
-#Include setting_handler.ahk
+#Include lib\action_lib.ahk
+#Include user\action.ahk
+#Include lib\customPopupBox.ahk
+#Include features\setting_handler.ahk
 #MaxThreadsPerHotkey 2
 
 ; ---- 管理員模式檢查 (v2 轉檔相容版) ----
@@ -28,11 +28,11 @@ global ASSET_DIR := APP_ROOT "\assets"
 
 ; 啟動APP時，取得 & 紀錄 action.ahk 的時間戳
 try {
-    baseTime := FileGetTime(APP_ROOT "\src\action.ahk", "M")
-    IniWrite(baseTime, APP_ROOT "\src\setting.ini", "System", "LastActionTime")
+    baseTime := FileGetTime(APP_ROOT "\src\user\action.ahk", "M")
+    IniWrite(baseTime, APP_ROOT "\src\user\setting.ini", "System", "LastActionTime")
 } catch {
     ; 如果檔案不存在，給個初始值，避免 ReloadHandler 報錯
-    IniWrite("0", APP_ROOT "\src\setting.ini", "System", "LastActionTime")
+    IniWrite("0", APP_ROOT "\src\user\setting.ini", "System", "LastActionTime")
 }
 
 ; --- Tray Icon ---
@@ -86,17 +86,40 @@ Tray.Add("退出程式", (*) => ExitApp())
 Tray.Default := "打開主視窗"
 
 ; --- 讀取 INI ---
-iniFilePath := SRC_DIR "\setting.ini"
-actionFilePath := SRC_DIR "\action.ahk"
+iniFilePath := SRC_DIR "\user\setting.ini"
+actionFilePath := SRC_DIR "\user\action.ahk"
 hotkeyMap := Map() ; 存儲ini的熱鍵與函式名
 global ActionFnStatus := Map() ; 紀錄 action 是否運作
 global isActionOpen := false
 global isSettingOpen := false
 
 ; 讀取 ini 檔案
-currentPos := IniRead(iniFilePath, "Window", "Pos", "xCenter yCenter")
-currentAot := IniRead(iniFilePath, "Window", "AlwaysOnTop", "ON") ; 預設為 ON
-currentTray := IniRead(iniFilePath, "Tray", "CloseToTray", "ON") ; 預設為 ON
+defaultIniPath := SRC_DIR "\reset\default_setting.ini"
+currentPos := ReadSettingWithDefault("Window", "Pos", "xCenter yCenter")
+currentAot := ReadSettingWithDefault("Window", "AlwaysOnTop", "ON")
+currentTray := ReadSettingWithDefault("Tray", "CloseToTray", "ON")
+
+; Runtime 缺少或留空時，依序使用 Reset 預設值、fallbackValue，並將結果寫回 Runtime
+ReadSettingWithDefault(section, key, fallbackValue) {
+    global iniFilePath, defaultIniPath
+
+    ; 第一次: 讀取 Runtime
+    value := IniRead(iniFilePath, section, key, "")
+    if (value != "")
+        return value
+
+    ; 第二次: 讀取 Reset 預設值
+    value := IniRead(defaultIniPath, section, key, fallbackValue)
+    if (value == "")
+    ; 第三次: 使用程式內建備援值
+        value := fallbackValue
+
+    ; 將取得的非空預設值寫回 Runtime
+    if (value != "")
+        IniWrite(value, iniFilePath, section, key)
+
+    return value
+}
 
 ; --- 決定要讀取的 Section ---
 ; 先看有沒有使用者自訂的 [Hotkey]，沒有就讀預設的 [default-hotkey]
@@ -535,7 +558,7 @@ ShowActionGui(*) {
 
 ScanActions() {
     global SRC_DIR ; 抓變數
-    actionFile := SRC_DIR "\action.ahk"
+    actionFile := SRC_DIR "\user\action.ahk"
     if !FileExist(actionFile)
         return [] ; 萬一檔案不存在，回傳一個預設值
 
@@ -940,13 +963,13 @@ HotReload(*) {
 ReloadHandler(*) {
     ; 取得觸發 Reload 當下的時間
     try {
-        currentTime := FileGetTime(APP_ROOT "\src\action.ahk", "M")
+        currentTime := FileGetTime(APP_ROOT "\src\user\action.ahk", "M")
     } catch {
         currentTime := "0"
     }
 
     ;讀取設定檔中紀錄的時間
-    baseTime := IniRead(APP_ROOT "\src\setting.ini", "System", "LastActionTime", "")
+    baseTime := IniRead(APP_ROOT "\src\user\setting.ini", "System", "LastActionTime", "")
 
     ;比對時間: 如果硬碟上的時間比紀錄的還要新
     if (baseTime != "0" && currentTime > baseTime) {
