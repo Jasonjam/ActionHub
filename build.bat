@@ -57,9 +57,9 @@ echo.
 :: 延遲1秒
 call :wait
 
-if not exist "src\action.ahk" (
-    if exist "src\action.ahk.template" (
-        move "src\action.ahk.template" "src\action.ahk" >nul
+if not exist "src\user\action.ahk" (
+    if exist "src\user\action.ahk.template" (
+        move "src\user\action.ahk.template" "src\user\action.ahk" >nul
         echo       [+] 已將 action.ahk.template 轉為 action.ahk
         echo           Converted action.ahk.template to action.ahk
         echo.
@@ -77,9 +77,9 @@ echo.
 :: 延遲1秒
 call :wait
 
-if not exist "src\setting.ini" (
-    if exist "src\setting.ini.template" (
-        move "src\setting.ini.template" "src\setting.ini" >nul
+if not exist "src\user\setting.ini" (
+    if exist "src\user\setting.ini.template" (
+        move "src\user\setting.ini.template" "src\user\setting.ini" >nul
         echo       [+] 已將 setting.ini.template 轉為 setting.ini
         echo           Converted setting.ini.template to setting.ini
         echo.
