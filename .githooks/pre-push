@@ -3,6 +3,67 @@
 echo ""
 echo "========== PUSH 前處理 =========="
 
+echo ""
+echo "========== Build BAT 格式檢查 =========="
+
+BAT_FILE="build.bat"
+BAT_TEMP="$(mktemp)"
+export BAT_TEMP_WIN="$(cygpath -w "$BAT_TEMP")"
+
+# 讀取目前 Commit 中的 build.bat
+if ! git show "HEAD:$BAT_FILE" > "$BAT_TEMP"; then
+    echo "[錯誤] 無法讀取 Commit 中的 $BAT_FILE"
+    rm -f "$BAT_TEMP"
+    exit 1
+fi
+
+# 檢查 UTF-8 無 BOM 與 CRLF
+if ! powershell.exe -NoProfile -Command '
+    $ErrorActionPreference = "Stop"
+    $path = $env:BAT_TEMP_WIN
+    $data = [System.IO.File]::ReadAllBytes($path)
+
+    try {
+        $utf8 = New-Object System.Text.UTF8Encoding($false, $true)
+        $null = $utf8.GetString($data)
+    } catch {
+        Write-Host "[錯誤] build.bat 不是有效的 UTF-8"
+        exit 1
+    }
+
+    if ($data.Length -ge 3 -and
+        $data[0] -eq 239 -and
+        $data[1] -eq 187 -and
+        $data[2] -eq 191) {
+        Write-Host "[錯誤] build.bat 含有 UTF-8 BOM"
+        exit 1
+    }
+
+    for ($i = 0; $i -lt $data.Length; $i++) {
+        if ($data[$i] -eq 10) {
+            if ($i -eq 0 -or $data[$i - 1] -ne 13) {
+                Write-Host "[錯誤] build.bat 含有 LF 換行，必須使用 CRLF"
+                exit 1
+            }
+        }
+
+        if ($data[$i] -eq 13) {
+            if ($i + 1 -ge $data.Length -or $data[$i + 1] -ne 10) {
+                Write-Host "[錯誤] build.bat 含有單獨 CR 換行"
+                exit 1
+            }
+        }
+    }
+
+    Write-Host "✓ build.bat：UTF-8 無 BOM + CRLF"
+'; then
+    rm -f "$BAT_TEMP"
+    echo "PUSH 已中止，請確認 build.bat 的格式。"
+    exit 1
+fi
+
+rm -f "$BAT_TEMP"
+
 ACTION_RUNTIME="src/user/action.ahk"
 ACTION_TEMPLATE="src/user/action.ahk.template"
 SETTING_RUNTIME="src/user/setting.ini"
