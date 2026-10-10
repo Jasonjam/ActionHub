@@ -328,7 +328,7 @@ ToggleAction(actionName, intervalMs := 100, *) {
 ; --- Action GUI ---
 ShowActionGui(*) {
     global isActionOpen, guiHotkeyList
-    static actionGui := 0 ; 紀錄已開啟的視窗，避免重複打開多個 Action GUI
+    static actionGui := 0 ; 紀錄 Action GUI 狀態，區分首次開啟與重新建立
     static actionRows := [] ; 宣告，用來存儲每一行的控制項物件(main用)
     static previewHKList := [] ; 草稿副本，action用
 
@@ -370,14 +370,6 @@ ShowActionGui(*) {
         return opt
     }
 
-    ; 如果Action已打開，就直接帶到最前面
-    try {
-        if (actionGui != 0 && WinExist("ahk_id " actionGui.Hwnd)) {
-            actionGui.Show()
-            return
-        }
-    }
-
     ; --- 禁用主視窗 (使其不可點擊) ---
     isActionOpen := true
     mainGui.Opt("+Disabled")
@@ -388,8 +380,7 @@ ShowActionGui(*) {
     offsetY := mainY + 50  ; 向下位移 50 像素
 
     ; 建立 Action GUI
-    actionGui := Gui("-MinimizeBox -MaximizeBox", "Hotkey Actions") ;新視窗移除縮小,放大
-    actionGui.Opt("+Owner" mainGui.Hwnd) ; 設定 Main GUI 為 Owner, 讓 Action GUI 跟隨 Main GUI 的視窗層級
+    actionGui := Gui("+Owner" mainGui.Hwnd " -MinimizeBox -MaximizeBox", "Hotkey Actions") ; 建立 GUI 的同時，指定 Owner
     actionGui.SetFont("s10", "Microsoft JhengHei")
 
     ; --- 綁定關閉事件 (用來還原 MAIN PAGE 狀態) ---
@@ -584,15 +575,6 @@ ScanActions() {
 ; --- Setting GUI ---
 ShowSettingGui(*) {
     global isSettingOpen
-    static settingGui := 0 ; 紀錄已開啟的視窗，避免重複打開多個 Setting GUI
-
-    ; 如果 Setting 已打開，就直接帶到最前面
-    try {
-        if (settingGui != 0 && WinExist("ahk_id " settingGui.Hwnd)) {
-            settingGui.Show()
-            return
-        }
-    }
 
     ; --- 禁用主視窗 (使其不可點擊) ---
     isSettingOpen := true
@@ -724,7 +706,6 @@ ShowSettingGui(*) {
         ApplySettings() ; 關閉時套用設定
 
         guiObj.Destroy()
-        settingGui := 0 ; 清空 static 變數
     }
 }
 
